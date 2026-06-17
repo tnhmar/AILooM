@@ -19,7 +19,8 @@ from __future__ import annotations
 
 import asyncio
 import re
-from typing import Any, Sequence, cast
+from collections.abc import Sequence
+from typing import Any, cast
 
 import chromadb
 from chromadb.api import ClientAPI
