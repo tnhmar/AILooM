@@ -1,4 +1,4 @@
-"""Domain request/response objects: Scope, WriteRequest, SearchRequest, RecallRequest, etc."""
+"""Domain request/response objects and core domain entities."""
 
 from __future__ import annotations
 
@@ -8,6 +8,11 @@ from enum import StrEnum
 from typing import Any
 
 from memory_layer.domain.types import (
+    AuditId,
+    AuditOperation,
+    AuditOutcome,
+    EntityId,
+    FactId,
     LifecycleState,
     MemoryId,
     MemorySector,
@@ -175,3 +180,98 @@ class RecallResult:
     total_tokens_estimate: int = 0
     recall_strategy: str = ""
     recalled_at: datetime = field(default_factory=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# MemoryRecord  (M1-T2)
+# CRITICAL INVARIANT: lifecycle_state defaults to ACTIVE.
+# Records are searchable immediately on durable write.
+# pipeline_status alone reflects enrichment progress — never lifecycle_state.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MemoryRecord:
+    """Central domain entity representing a persisted memory payload."""
+
+    id: MemoryId
+    tenant_id: TenantId
+    scope: Scope
+    raw_payload: str
+    payload_type: PayloadType
+    sector: MemorySector
+    lifecycle_state: LifecycleState = LifecycleState.ACTIVE
+    pipeline_status: PipelineStatus = PipelineStatus.PENDING
+    recorded_at: datetime = field(default_factory=datetime.utcnow)
+    idempotency_key: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# Fact  (M1-T2)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Fact:
+    """An extracted, versioned, temporal fact derived from a MemoryRecord."""
+
+    id: FactId
+    memory_record_id: MemoryId
+    tenant_id: TenantId
+    scope: Scope
+    subject_entity_id: EntityId
+    predicate: str
+    predicate_group: str
+    object_value: str
+    effective_from: datetime
+    effective_to: datetime | None = None
+    recorded_at: datetime = field(default_factory=datetime.utcnow)
+    supersedes: FactId | None = None
+    confidence: float = 1.0
+    sector: MemorySector = MemorySector.SEMANTIC
+    lifecycle_state: LifecycleState = LifecycleState.ACTIVE
+
+
+# ---------------------------------------------------------------------------
+# AuditEntry  (M1-T2)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class AuditEntry:
+    """Immutable audit log entry recording an operation on the memory layer."""
+
+    id: AuditId
+    tenant_id: TenantId
+    scope: Scope
+    operation: AuditOperation
+    memory_id: MemoryId | None = None
+    actor: str = "system"
+    timestamp: datetime = field(default_factory=datetime.utcnow)
+    outcome: AuditOutcome = AuditOutcome.SUCCESS
+    detail: dict[str, Any] = field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# MemoryTrace  (M1-T2)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class MemoryTrace:
+    """Mutable trace aggregating the full lifecycle of a single MemoryRecord."""
+
+    trace_id: TraceId
+    memory_id: MemoryId
+    scope: Scope
+    write_event: AuditEntry
+    enrichment_status: PipelineStatus
+    facts_derived: list[FactId] = field(default_factory=list)
+    entities_extracted: list[EntityId] = field(default_factory=list)
+    mutations: list[AuditEntry] = field(default_factory=list)
+    recall_event: AuditEntry | None = None
+    recall_signals: dict[str, Any] | None = None
+    recall_explanation: str | None = None
+    query_plan: Any | None = None
+    constructed_at: datetime = field(default_factory=datetime.utcnow)
