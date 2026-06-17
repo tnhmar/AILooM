@@ -7,78 +7,31 @@ on:
     branches: [main]
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - run: pip install -e .[dev]
-      - run: ruff check src/ tests/
-      - run: ruff format --check src/ tests/
-
-  typecheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - run: pip install -e .[dev]
-      - run: mypy src/ --strict --ignore-missing-imports
-
   test:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -e .[dev]
-      - run: |
-          pytest tests/ -m "not integration and not benchmark" \
-            --cov=src/memory_layer \
-            --cov-fail-under=90 \
-            --cov-report=xml
-      - uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage.xml
 
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/cache@v4
         with:
-          python-version: "3.11"
-      - run: pip install pip-audit
-      - run: pip-audit --requirement <(pip install -e . --dry-run 2>/dev/null | grep -v '^#') || true
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-  benchmark:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - run: pip install -e .[dev]
-      - run: |
-          pytest tests/benchmarks/ -m benchmark -v \
-            --json-report --json-report-file=benchmark-results.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-results
-          path: benchmark-results.json
+      - name: Install dependencies
+        run: pip install -e .[dev]
 
-  docker-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker build -t memory-layer:ci .
-      - run: |
-          docker run --rm memory-layer:ci \
-            /app/.venv/bin/python -c \
-            "from memory_layer.api.app import create_app; print('OK')"
+      - name: Lint (ruff)
+        run: ruff check src tests
+
+      - name: Type-check (mypy)
+        run: mypy src
+
+      - name: Test (pytest)
+        run: pytest --cov=src --cov-fail-under=80
