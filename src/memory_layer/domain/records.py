@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 from memory_layer.domain.types import (
     LifecycleState,
@@ -94,7 +95,7 @@ class WriteRequest:
     idempotency_key: str | None = None
     extract: bool = True
     wait_for_enrichment: bool = False
-    metadata: dict = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -159,7 +160,7 @@ class RecallItem:
     lifecycle_state: LifecycleState
     pipeline_status: PipelineStatus
     effective_from: datetime | None = None
-    signals: dict = field(default_factory=dict)
+    signals: dict[str, Any] = field(default_factory=dict)
     explanation: str = ""
     trace_id: TraceId | None = None
 

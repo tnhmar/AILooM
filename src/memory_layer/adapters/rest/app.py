@@ -1,5 +1,7 @@
 """FastAPI application factory and Typer CLI entry point for memory-layer."""
 
+from __future__ import annotations
+
 import typer
 
 cli = typer.Typer(name="memory-layer", help="memory-layer: AI memory layer CLI.")
@@ -23,7 +25,7 @@ def serve(
     )
 
 
-def create_app():
+def create_app() -> "FastAPI":
     """FastAPI application factory — wires routes, middleware, and lifecycle hooks."""
     from fastapi import FastAPI
 
@@ -34,7 +36,7 @@ def create_app():
     )
 
     @app.get("/healthz", tags=["health"])
-    async def healthz() -> dict:
+    async def healthz() -> dict[str, str]:
         return {"status": "ok", "version": "0.1.0"}
 
     return app
