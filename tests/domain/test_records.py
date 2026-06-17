@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import pytest
-
 from memory_layer.domain.records import (
     RecallItem,
     RecallRequest,
@@ -19,15 +17,12 @@ from memory_layer.domain.records import (
 )
 from memory_layer.domain.types import (
     LifecycleState,
-    MemoryId,
     MemorySector,
     PayloadType,
     PipelineStatus,
     PrincipalId,
-    PrincipalType,
     TenantId,
     new_memory_id,
-    new_tenant_id,
 )
 
 
@@ -43,7 +38,7 @@ def _scope() -> Scope:
 
 
 def _write_request(**kwargs) -> WriteRequest:
-    defaults = dict(
+    defaults: dict = dict(
         tenant_id=TenantId("t-1"),
         scope=_scope(),
         raw_payload="hello",
@@ -54,7 +49,7 @@ def _write_request(**kwargs) -> WriteRequest:
 
 
 def _search_request(**kwargs) -> SearchRequest:
-    defaults = dict(
+    defaults: dict = dict(
         tenant_id=TenantId("t-1"),
         scope=_scope(),
         query="what is the user's name?",
@@ -64,7 +59,7 @@ def _search_request(**kwargs) -> SearchRequest:
 
 
 def _recall_request(**kwargs) -> RecallRequest:
-    defaults = dict(
+    defaults: dict = dict(
         tenant_id=TenantId("t-1"),
         scope=_scope(),
         query="what is the user's name?",

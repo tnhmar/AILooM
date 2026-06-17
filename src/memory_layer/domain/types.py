@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from enum import Enum
+from enum import StrEnum
 from typing import NewType
 
 # ---------------------------------------------------------------------------
@@ -70,11 +70,12 @@ def new_job_id() -> JobId:
 
 
 # ---------------------------------------------------------------------------
-# Enums — all (str, Enum) for JSON round-trip
+# Enums — all StrEnum for JSON round-trip (Python 3.11+)
 # ---------------------------------------------------------------------------
 
-class LifecycleState(str, Enum):
+class LifecycleState(StrEnum):
     """Lifecycle states a MemoryRecord can occupy."""
+
     ACTIVE = "ACTIVE"
     PROPOSED = "PROPOSED"
     CONSOLIDATED = "CONSOLIDATED"
@@ -83,16 +84,18 @@ class LifecycleState(str, Enum):
     DELETED = "DELETED"
 
 
-class PipelineStatus(str, Enum):
+class PipelineStatus(StrEnum):
     """Enrichment pipeline processing status for a MemoryRecord."""
+
     PENDING = "PENDING"
     ENRICHED = "ENRICHED"
     PARTIAL_ENRICHMENT_FAILED = "PARTIAL_ENRICHMENT_FAILED"
     ENRICHMENT_SKIPPED = "ENRICHMENT_SKIPPED"
 
 
-class MemorySector(str, Enum):
+class MemorySector(StrEnum):
     """Cognitive sector a memory record is classified into."""
+
     EPISODIC = "EPISODIC"
     SEMANTIC = "SEMANTIC"
     PROCEDURAL = "PROCEDURAL"
@@ -101,8 +104,9 @@ class MemorySector(str, Enum):
     REFLECTIVE = "REFLECTIVE"
 
 
-class PayloadType(str, Enum):
+class PayloadType(StrEnum):
     """Semantic type of the raw payload stored in a MemoryRecord."""
+
     CONVERSATION_TURN = "CONVERSATION_TURN"
     DOCUMENT = "DOCUMENT"
     TOOL_OUTPUT = "TOOL_OUTPUT"
@@ -110,14 +114,16 @@ class PayloadType(str, Enum):
     STRUCTURED = "STRUCTURED"
 
 
-class PrincipalType(str, Enum):
+class PrincipalType(StrEnum):
     """Type of the principal (actor) interacting with the memory layer."""
+
     USER = "USER"
     AGENT = "AGENT"
 
 
-class AuditOperation(str, Enum):
+class AuditOperation(StrEnum):
     """Operations recorded in the audit log."""
+
     WRITE = "WRITE"
     SEARCH = "SEARCH"
     RECALL = "RECALL"
@@ -128,8 +134,9 @@ class AuditOperation(str, Enum):
     MIGRATION = "MIGRATION"
 
 
-class AuditOutcome(str, Enum):
+class AuditOutcome(StrEnum):
     """Outcome of an audited operation."""
+
     SUCCESS = "SUCCESS"
     PARTIAL = "PARTIAL"
     FAILED = "FAILED"

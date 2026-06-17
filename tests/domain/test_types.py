@@ -20,16 +20,14 @@ from memory_layer.domain.types import (
     LifecycleState,
     MemorySector,
     PipelineStatus,
-    (
-        new_audit_id,
-        new_fact_id,
-        new_job_id,
-        new_memory_id,
-        new_policy_id,
-        new_schedule_id,
-        new_tenant_id,
-        new_trace_id,
-    ),
+    new_audit_id,
+    new_fact_id,
+    new_job_id,
+    new_memory_id,
+    new_policy_id,
+    new_schedule_id,
+    new_tenant_id,
+    new_trace_id,
 )
 
 
