@@ -16,8 +16,7 @@ Design notes
 
 from __future__ import annotations
 
-import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import aiosqlite
@@ -36,22 +35,20 @@ from memory_layer.domain.types import (
     MemorySector,
     PrincipalId,
     PrincipalType,
-    SessionId,
     TenantId,
-    WorkspaceId,
 )
 
 
 def _dt_to_str(dt: datetime) -> str:
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return dt.isoformat()
 
 
 def _str_to_dt(value: str) -> datetime:
     dt = datetime.fromisoformat(value)
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return dt
 
 
@@ -98,7 +95,7 @@ class SqliteFactRepository:
         scope = Scope(
             tenant_id=TenantId(row["tenant_id"]),
             principal_id=PrincipalId(row["principal_id"]),
-            principal_type=PrincipalType.USER,  # facts inherit USER scope by default
+            principal_type=PrincipalType.USER,
         )
         return Fact(
             id=FactId(row["id"]),

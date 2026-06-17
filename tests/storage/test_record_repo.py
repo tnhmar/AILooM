@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 import pytest_asyncio
@@ -73,7 +73,7 @@ def _make_record(
         sector=MemorySector.EPISODIC,
         lifecycle_state=lifecycle_state,
         pipeline_status=pipeline_status,
-        recorded_at=recorded_at or datetime.now(timezone.utc),
+        recorded_at=recorded_at or datetime.now(UTC),
         idempotency_key=idempotency_key,
         metadata=metadata or {},
     )
@@ -246,7 +246,7 @@ async def test_get_by_id_wrong_tenant_raises(
 async def test_recorded_at_roundtrips_as_datetime(
     repo: SqliteMemoryRecordRepository,
 ) -> None:
-    dt = datetime(2026, 3, 15, 12, 0, 0, tzinfo=timezone.utc)
+    dt = datetime(2026, 3, 15, 12, 0, 0, tzinfo=UTC)
     record = _make_record(recorded_at=dt)
     await repo.save(record)
     fetched = await repo.get_by_id(record.id, record.tenant_id)

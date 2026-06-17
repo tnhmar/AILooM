@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -27,7 +27,7 @@ from memory_layer.storage.sqlite.fact_repo import SqliteFactRepository
 
 pytestmark = pytest.mark.asyncio
 
-_NOW = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+_NOW = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
 _ENTITY = EntityId("entity-abc")
 _PRED_GROUP = "preference"
 

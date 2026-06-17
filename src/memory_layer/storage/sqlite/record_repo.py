@@ -23,7 +23,7 @@ Design notes
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import aiosqlite
@@ -48,7 +48,7 @@ from memory_layer.domain.types import (
 def _dt_to_str(dt: datetime) -> str:
     """Serialise a datetime to an ISO-8601 UTC string."""
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return dt.isoformat()
 
 
@@ -56,7 +56,7 @@ def _str_to_dt(value: str) -> datetime:
     """Deserialise an ISO-8601 string to a timezone-aware UTC datetime."""
     dt = datetime.fromisoformat(value)
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return dt
 
 

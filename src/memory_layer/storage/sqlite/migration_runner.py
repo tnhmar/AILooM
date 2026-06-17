@@ -17,8 +17,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
-from datetime import datetime, timezone
-from importlib.resources import files
+from datetime import UTC, datetime
 from pathlib import Path
 
 from memory_layer.domain.exceptions import SchemaVersionError
@@ -117,14 +116,15 @@ def run_migrations(conn: sqlite3.Connection) -> list[int]:
                 continue
 
             sql = path.read_text(encoding="utf-8")
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
 
             conn.execute("BEGIN")
             try:
                 conn.executescript(sql)
                 # executescript implicitly commits; record version in its own statement.
                 conn.execute(
-                    "INSERT INTO schema_version (version, description, applied_at) VALUES (?, ?, ?)",
+                    "INSERT INTO schema_version"
+                    " (version, description, applied_at) VALUES (?, ?, ?)",
                     (version, path.stem, now),
                 )
                 conn.execute("COMMIT")
