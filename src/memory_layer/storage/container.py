@@ -64,7 +64,7 @@ class LocalContainer:
         cls,
         db_path: str = "./memory_layer.db",
         chroma_dir: str = "./chroma_data",
-    ) -> "LocalContainer":
+    ) -> LocalContainer:
         """Create a fully wired :class:`LocalContainer`.
 
         Applies all pending SQLite migrations before constructing adapters.
