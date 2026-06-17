@@ -54,6 +54,13 @@ class EventType(StrEnum):
 # Base event
 # ---------------------------------------------------------------------------
 
+_EMPTY_MEMORY_ID = MemoryId("")
+_EMPTY_FACT_ID = FactId("")
+_EMPTY_ENTITY_ID = EntityId("")
+_EMPTY_SESSION_ID = SessionId("")
+_EMPTY_JOB_ID = JobId("")
+_EMPTY_SCHEDULE_ID = ScheduleId("")
+
 
 @dataclass(frozen=True)
 class MemoryEvent:
@@ -61,7 +68,7 @@ class MemoryEvent:
 
     tenant_id: TenantId
     event_id: str = field(default_factory=lambda: str(uuid4()))
-    # Subclasses set this via object.__setattr__ in __post_init__.
+    # Subclasses override via object.__setattr__ in __post_init__ (frozen pattern).
     event_type: EventType = field(init=False, default=EventType.MEMORY_WRITTEN)
     occurred_at: datetime = field(default_factory=datetime.utcnow)
     correlation_id: str | None = None
@@ -76,8 +83,8 @@ class MemoryEvent:
 class MemoryWrittenEvent(MemoryEvent):
     """Emitted after a MemoryRecord is durably persisted."""
 
-    memory_id: MemoryId = ""
-    scope: Scope = field(default_factory=lambda: None)  # type: ignore[arg-type]
+    memory_id: MemoryId = _EMPTY_MEMORY_ID
+    scope: Scope | None = None
     sector: MemorySector = MemorySector.EPISODIC
     pipeline_status: PipelineStatus = PipelineStatus.PENDING
 
@@ -89,8 +96,8 @@ class MemoryWrittenEvent(MemoryEvent):
 class MemoryEnrichedEvent(MemoryEvent):
     """Emitted after enrichment pipeline completes successfully."""
 
-    memory_id: MemoryId = ""
-    scope: Scope = field(default_factory=lambda: None)  # type: ignore[arg-type]
+    memory_id: MemoryId = _EMPTY_MEMORY_ID
+    scope: Scope | None = None
     facts_extracted: int = 0
     entities_extracted: int = 0
 
@@ -102,8 +109,8 @@ class MemoryEnrichedEvent(MemoryEvent):
 class EnrichmentFailedEvent(MemoryEvent):
     """Emitted when the enrichment pipeline fails for a record."""
 
-    memory_id: MemoryId = ""
-    scope: Scope = field(default_factory=lambda: None)  # type: ignore[arg-type]
+    memory_id: MemoryId = _EMPTY_MEMORY_ID
+    scope: Scope | None = None
     error: str = ""
 
     def __post_init__(self) -> None:
@@ -114,7 +121,7 @@ class EnrichmentFailedEvent(MemoryEvent):
 class FactsExtractedEvent(MemoryEvent):
     """Emitted after facts are extracted from a MemoryRecord."""
 
-    memory_id: MemoryId = ""
+    memory_id: MemoryId = _EMPTY_MEMORY_ID
     fact_ids: tuple[FactId, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
@@ -125,9 +132,9 @@ class FactsExtractedEvent(MemoryEvent):
 class ContradictionDetectedEvent(MemoryEvent):
     """Emitted when a new fact directly contradicts an existing one."""
 
-    new_fact_id: FactId = ""
-    superseded_fact_id: FactId = ""
-    entity_id: EntityId = ""
+    new_fact_id: FactId = _EMPTY_FACT_ID
+    superseded_fact_id: FactId = _EMPTY_FACT_ID
+    entity_id: EntityId = _EMPTY_ENTITY_ID
     predicate_group: str = ""
 
     def __post_init__(self) -> None:
@@ -136,10 +143,10 @@ class ContradictionDetectedEvent(MemoryEvent):
 
 @dataclass(frozen=True)
 class ContradictionLowConfidenceEvent(MemoryEvent):
-    """Emitted when a potential contradiction is flagged but confidence is below threshold."""
+    """Emitted when a potential contradiction is flagged below confidence threshold."""
 
-    new_fact_id: FactId = ""
-    entity_id: EntityId = ""
+    new_fact_id: FactId = _EMPTY_FACT_ID
+    entity_id: EntityId = _EMPTY_ENTITY_ID
     predicate_group: str = ""
     confidence: float = 0.0
 
@@ -151,7 +158,7 @@ class ContradictionLowConfidenceEvent(MemoryEvent):
 class MemoryRecalledEvent(MemoryEvent):
     """Emitted after a successful recall operation returns results."""
 
-    scope: Scope = field(default_factory=lambda: None)  # type: ignore[arg-type]
+    scope: Scope | None = None
     query_hash: str = ""
     items_returned: int = 0
     total_tokens_estimate: int = 0
@@ -166,7 +173,7 @@ class MemoryRecalledEvent(MemoryEvent):
 class RecallNoMatchEvent(MemoryEvent):
     """Emitted when a recall query returns no matching records."""
 
-    scope: Scope = field(default_factory=lambda: None)  # type: ignore[arg-type]
+    scope: Scope | None = None
     query_hash: str = ""
     reason: str = ""
 
@@ -178,8 +185,8 @@ class RecallNoMatchEvent(MemoryEvent):
 class MemoryConsolidatedEvent(MemoryEvent):
     """Emitted when a MemoryRecord transitions to CONSOLIDATED state."""
 
-    memory_id: MemoryId = ""
-    scope: Scope = field(default_factory=lambda: None)  # type: ignore[arg-type]
+    memory_id: MemoryId = _EMPTY_MEMORY_ID
+    scope: Scope | None = None
     previous_state: LifecycleState = LifecycleState.ACTIVE
 
     def __post_init__(self) -> None:
@@ -190,8 +197,8 @@ class MemoryConsolidatedEvent(MemoryEvent):
 class MemoryDecayedEvent(MemoryEvent):
     """Emitted when a MemoryRecord transitions to DECAYED state."""
 
-    memory_id: MemoryId = ""
-    scope: Scope = field(default_factory=lambda: None)  # type: ignore[arg-type]
+    memory_id: MemoryId = _EMPTY_MEMORY_ID
+    scope: Scope | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "event_type", EventType.MEMORY_DECAYED)
@@ -201,8 +208,8 @@ class MemoryDecayedEvent(MemoryEvent):
 class MemoryArchivedEvent(MemoryEvent):
     """Emitted when a MemoryRecord transitions to ARCHIVED state."""
 
-    memory_id: MemoryId = ""
-    scope: Scope = field(default_factory=lambda: None)  # type: ignore[arg-type]
+    memory_id: MemoryId = _EMPTY_MEMORY_ID
+    scope: Scope | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "event_type", EventType.MEMORY_ARCHIVED)
@@ -212,8 +219,8 @@ class MemoryArchivedEvent(MemoryEvent):
 class MemoryDeletedEvent(MemoryEvent):
     """Emitted when a MemoryRecord is permanently deleted."""
 
-    memory_id: MemoryId = ""
-    scope: Scope = field(default_factory=lambda: None)  # type: ignore[arg-type]
+    memory_id: MemoryId = _EMPTY_MEMORY_ID
+    scope: Scope | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "event_type", EventType.MEMORY_DELETED)
@@ -221,10 +228,10 @@ class MemoryDeletedEvent(MemoryEvent):
 
 @dataclass(frozen=True)
 class SessionEndedEvent(MemoryEvent):
-    """Emitted when an agent session concludes, triggering consolidation if configured."""
+    """Emitted when an agent session concludes."""
 
-    session_id: SessionId = ""
-    scope: Scope = field(default_factory=lambda: None)  # type: ignore[arg-type]
+    session_id: SessionId = _EMPTY_SESSION_ID
+    scope: Scope | None = None
     record_count: int = 0
 
     def __post_init__(self) -> None:
@@ -235,8 +242,8 @@ class SessionEndedEvent(MemoryEvent):
 class ConsolidationJobStartedEvent(MemoryEvent):
     """Emitted when a scheduled or on-demand consolidation job begins."""
 
-    job_id: JobId = ""
-    schedule_id: ScheduleId = ""
+    job_id: JobId = _EMPTY_JOB_ID
+    schedule_id: ScheduleId = _EMPTY_SCHEDULE_ID
     trigger: str = ""
 
     def __post_init__(self) -> None:
@@ -247,7 +254,7 @@ class ConsolidationJobStartedEvent(MemoryEvent):
 class ConsolidationJobCompletedEvent(MemoryEvent):
     """Emitted when a consolidation job finishes."""
 
-    job_id: JobId = ""
+    job_id: JobId = _EMPTY_JOB_ID
     records_processed: int = 0
     duration_ms: int = 0
 
