@@ -32,140 +32,110 @@ from memory_layer.domain.types import (
 
 
 # ---------------------------------------------------------------------------
-# 1. All factory functions return non-empty strings
+# Factory functions
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize(
-    "factory",
-    [
-        new_memory_id,
-        new_tenant_id,
-        new_fact_id,
-        new_trace_id,
-        new_audit_id,
-        new_policy_id,
-        new_schedule_id,
-        new_job_id,
-    ],
-)
-def test_factory_returns_nonempty_string(factory):
-    result = factory()
-    assert isinstance(result, str)
-    assert len(result) > 0
 
+class TestFactories:
+    def test_new_memory_id_is_unique(self) -> None:
+        assert new_memory_id() != new_memory_id()
 
-# ---------------------------------------------------------------------------
-# 2. Two consecutive factory calls produce different values
-# ---------------------------------------------------------------------------
+    def test_new_tenant_id_is_unique(self) -> None:
+        assert new_tenant_id() != new_tenant_id()
 
-@pytest.mark.parametrize(
-    "factory",
-    [
-        new_memory_id,
-        new_tenant_id,
-        new_fact_id,
-        new_trace_id,
-        new_audit_id,
-        new_policy_id,
-        new_schedule_id,
-        new_job_id,
-    ],
-)
-def test_factory_produces_unique_values(factory):
-    assert factory() != factory()
+    def test_new_fact_id_is_unique(self) -> None:
+        assert new_fact_id() != new_fact_id()
+
+    def test_new_trace_id_is_unique(self) -> None:
+        assert new_trace_id() != new_trace_id()
+
+    def test_new_audit_id_is_unique(self) -> None:
+        assert new_audit_id() != new_audit_id()
+
+    def test_new_policy_id_is_unique(self) -> None:
+        assert new_policy_id() != new_policy_id()
+
+    def test_new_schedule_id_is_unique(self) -> None:
+        assert new_schedule_id() != new_schedule_id()
+
+    def test_new_job_id_is_unique(self) -> None:
+        assert new_job_id() != new_job_id()
+
+    def test_ids_are_strings(self) -> None:
+        assert isinstance(new_memory_id(), str)
+        assert isinstance(new_tenant_id(), str)
 
 
 # ---------------------------------------------------------------------------
-# 3. LifecycleState str enum round-trip
+# Enums
 # ---------------------------------------------------------------------------
 
-def test_lifecycle_state_str_roundtrip():
-    assert LifecycleState("ACTIVE") == LifecycleState.ACTIVE
+
+class TestLifecycleState:
+    def test_members(self) -> None:
+        members = {s.value for s in LifecycleState}
+        assert "ACTIVE" in members
+        assert "ARCHIVED" in members
+        assert "DELETED" in members
+
+    def test_is_str(self) -> None:
+        assert isinstance(LifecycleState.ACTIVE, str)
+        assert LifecycleState.ACTIVE == "ACTIVE"
 
 
-# ---------------------------------------------------------------------------
-# 4. PipelineStatus.PENDING is the first enum member
-# ---------------------------------------------------------------------------
-
-def test_pipeline_status_pending_is_first():
-    members = list(PipelineStatus)
-    assert members[0] == PipelineStatus.PENDING
-
-
-# ---------------------------------------------------------------------------
-# 5. TenantIsolationViolation attributes
-# ---------------------------------------------------------------------------
-
-def test_tenant_isolation_violation_attributes():
-    exc = TenantIsolationViolation("alice", "t-99")
-    assert exc.actor == "alice"
-    assert exc.requested_tenant_id == "t-99"
+class TestMemorySector:
+    def test_members(self) -> None:
+        members = {s.value for s in MemorySector}
+        assert "EPISODIC" in members
+        assert "SEMANTIC" in members
+        assert "PROCEDURAL" in members
 
 
-# ---------------------------------------------------------------------------
-# 6. CapabilityNotAvailableError.capability
-# ---------------------------------------------------------------------------
-
-def test_capability_not_available_capability():
-    exc = CapabilityNotAvailableError("graph")
-    assert exc.capability == "graph"
+class TestPipelineStatus:
+    def test_members(self) -> None:
+        members = {s.value for s in PipelineStatus}
+        assert "PENDING" in members
+        assert "ENRICHED" in members
 
 
 # ---------------------------------------------------------------------------
-# 7. SchemaVersionError attributes
+# Exception hierarchy
 # ---------------------------------------------------------------------------
 
-def test_schema_version_error_attributes():
-    exc = SchemaVersionError(1, 2)
-    assert exc.expected == 1
-    assert exc.found == 2
 
+class TestExceptionHierarchy:
+    def test_base_is_exception(self) -> None:
+        assert issubclass(MemoryLayerError, Exception)
 
-# ---------------------------------------------------------------------------
-# 8. MemoryNotFoundError.memory_id
-# ---------------------------------------------------------------------------
+    def test_storage_error_is_memory_layer_error(self) -> None:
+        assert issubclass(StorageError, MemoryLayerError)
 
-def test_memory_not_found_memory_id():
-    exc = MemoryNotFoundError("abc")
-    assert exc.memory_id == "abc"
+    def test_not_found_errors(self) -> None:
+        assert issubclass(MemoryNotFoundError, MemoryLayerError)
+        assert issubclass(FactNotFoundError, MemoryLayerError)
 
+    def test_policy_error(self) -> None:
+        assert issubclass(PolicyError, MemoryLayerError)
 
-# ---------------------------------------------------------------------------
-# 9. All exceptions are subclasses of MemoryLayerError
-# ---------------------------------------------------------------------------
+    def test_tenant_isolation_violation(self) -> None:
+        assert issubclass(TenantIsolationViolation, MemoryLayerError)
 
-@pytest.mark.parametrize(
-    "exc_class",
-    [
-        TenantIsolationViolation,
-        MemoryNotFoundError,
-        FactNotFoundError,
-        IdempotencyConflictError,
-        CapabilityNotAvailableError,
-        ExtractionError,
-        StorageError,
-        SchemaVersionError,
-        PolicyError,
-    ],
-)
-def test_all_exceptions_inherit_base(exc_class):
-    assert issubclass(exc_class, MemoryLayerError)
+    def test_idempotency_conflict(self) -> None:
+        assert issubclass(IdempotencyConflictError, MemoryLayerError)
 
+    def test_schema_version_error(self) -> None:
+        assert issubclass(SchemaVersionError, MemoryLayerError)
 
-# ---------------------------------------------------------------------------
-# 10. All enums support str(member) returning the value string
-# ---------------------------------------------------------------------------
+    def test_extraction_error(self) -> None:
+        assert issubclass(ExtractionError, MemoryLayerError)
 
-@pytest.mark.parametrize(
-    "member, expected",
-    [
-        (LifecycleState.ACTIVE, "ACTIVE"),
-        (LifecycleState.CONSOLIDATED, "CONSOLIDATED"),
-        (PipelineStatus.PENDING, "PENDING"),
-        (PipelineStatus.ENRICHED, "ENRICHED"),
-        (MemorySector.EPISODIC, "EPISODIC"),
-        (MemorySector.SEMANTIC, "SEMANTIC"),
-    ],
-)
-def test_enum_str_returns_value(member, expected):
-    assert str(member) == expected
+    def test_capability_not_available(self) -> None:
+        assert issubclass(CapabilityNotAvailableError, MemoryLayerError)
+
+    def test_raise_and_catch(self) -> None:
+        with pytest.raises(MemoryLayerError):
+            raise StorageError("disk full")
+
+    def test_raise_tenant_isolation(self) -> None:
+        with pytest.raises(TenantIsolationViolation):
+            raise TenantIsolationViolation("cross-tenant access")

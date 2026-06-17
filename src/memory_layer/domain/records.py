@@ -26,6 +26,7 @@ from memory_layer.domain.types import (
 # Enums
 # ---------------------------------------------------------------------------
 
+
 class SearchMode(StrEnum):
     """Retrieval mode used for search and recall operations."""
 
@@ -49,6 +50,7 @@ class RecallStatus(StrEnum):
 # Scope
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class Scope:
     """Immutable identity context attached to every memory operation."""
@@ -65,6 +67,7 @@ class Scope:
 # TemporalFilter
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class TemporalFilter:
     """Optional time-range constraints applied to search and recall queries."""
@@ -77,6 +80,7 @@ class TemporalFilter:
 # ---------------------------------------------------------------------------
 # Write
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class WriteRequest:
@@ -108,6 +112,7 @@ class WriteResult:
 # Search
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SearchRequest:
     """Request to search the memory index with configurable retrieval mode and filters."""
@@ -127,6 +132,7 @@ class SearchRequest:
 # ---------------------------------------------------------------------------
 # Recall
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class RecallRequest:

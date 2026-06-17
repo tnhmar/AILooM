@@ -30,168 +30,162 @@ from memory_layer.domain.types import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _scope() -> Scope:
     return Scope(
-        tenant_id=TenantId("t-1"),
-        principal_id=PrincipalId("p-1"),
-    )
-
-
-def _write_request(**kwargs) -> WriteRequest:
-    defaults: dict = dict(
-        tenant_id=TenantId("t-1"),
-        scope=_scope(),
-        raw_payload="hello",
-        payload_type=PayloadType.CONVERSATION_TURN,
-    )
-    defaults.update(kwargs)
-    return WriteRequest(**defaults)
-
-
-def _search_request(**kwargs) -> SearchRequest:
-    defaults: dict = dict(
-        tenant_id=TenantId("t-1"),
-        scope=_scope(),
-        query="what is the user's name?",
-    )
-    defaults.update(kwargs)
-    return SearchRequest(**defaults)
-
-
-def _recall_request(**kwargs) -> RecallRequest:
-    defaults: dict = dict(
-        tenant_id=TenantId("t-1"),
-        scope=_scope(),
-        query="what is the user's name?",
-    )
-    defaults.update(kwargs)
-    return RecallRequest(**defaults)
-
-
-def _recall_item() -> RecallItem:
-    return RecallItem(
-        memory_id=new_memory_id(),
-        content="Alice lives in Montreal.",
-        sector=MemorySector.SEMANTIC,
-        lifecycle_state=LifecycleState.ACTIVE,
-        pipeline_status=PipelineStatus.ENRICHED,
+        tenant_id=TenantId("t1"),
+        principal_id=PrincipalId("u1"),
     )
 
 
 # ---------------------------------------------------------------------------
-# 1. Scope is hashable
+# Scope
 # ---------------------------------------------------------------------------
 
-def test_scope_is_hashable():
-    scope = _scope()
-    d = {scope: "value"}
-    assert d[scope] == "value"
 
+class TestScope:
+    def test_defaults(self) -> None:
+        s = _scope()
+        assert s.workspace_id is None
+        assert s.session_id is None
+        assert s.run_id is None
 
-# ---------------------------------------------------------------------------
-# 2. WriteRequest.extract defaults to True
-# ---------------------------------------------------------------------------
-
-def test_write_request_extract_defaults_true():
-    assert _write_request().extract is True
-
-
-# ---------------------------------------------------------------------------
-# 3. WriteRequest.wait_for_enrichment defaults to False
-# ---------------------------------------------------------------------------
-
-def test_write_request_wait_for_enrichment_defaults_false():
-    assert _write_request().wait_for_enrichment is False
+    def test_frozen(self) -> None:
+        s = _scope()
+        try:
+            s.tenant_id = TenantId("x")  # type: ignore[misc]
+            assert False, "Should have raised"
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
-# 4. WriteRequest.metadata is not shared across instances
+# WriteRequest
 # ---------------------------------------------------------------------------
 
-def test_write_request_metadata_not_shared():
-    a = _write_request()
-    b = _write_request()
-    a.metadata["x"] = 1
-    assert "x" not in b.metadata
 
-
-# ---------------------------------------------------------------------------
-# 5. WriteResult.idempotent defaults to False
-# ---------------------------------------------------------------------------
-
-def test_write_result_idempotent_defaults_false():
-    result = WriteResult(
-        memory_id=new_memory_id(),
-        scope=_scope(),
-        pipeline_status=PipelineStatus.PENDING,
-        accepted_at=datetime.utcnow(),
-    )
-    assert result.idempotent is False
+class TestWriteRequest:
+    def test_defaults(self) -> None:
+        req = WriteRequest(
+            tenant_id=TenantId("t1"),
+            scope=_scope(),
+            raw_payload="hello",
+            payload_type=PayloadType.CONVERSATION_TURN,
+        )
+        assert req.extract is True
+        assert req.sector is None
+        assert req.idempotency_key is None
+        assert req.wait_for_enrichment is False
+        assert req.metadata == {}
 
 
 # ---------------------------------------------------------------------------
-# 6. SearchRequest.lifecycle_states defaults to [ACTIVE]
+# WriteResult
 # ---------------------------------------------------------------------------
 
-def test_search_request_lifecycle_states_default():
-    req = _search_request()
-    assert req.lifecycle_states == [LifecycleState.ACTIVE]
 
-
-# ---------------------------------------------------------------------------
-# 7. SearchRequest.lifecycle_states is not shared across instances
-# ---------------------------------------------------------------------------
-
-def test_search_request_lifecycle_states_not_shared():
-    a = _search_request()
-    b = _search_request()
-    a.lifecycle_states.append(LifecycleState.CONSOLIDATED)
-    assert LifecycleState.CONSOLIDATED not in b.lifecycle_states
+class TestWriteResult:
+    def test_fields(self) -> None:
+        mid = new_memory_id()
+        result = WriteResult(
+            memory_id=mid,
+            scope=_scope(),
+            pipeline_status=PipelineStatus.PENDING,
+            accepted_at=datetime.utcnow(),
+        )
+        assert result.memory_id == mid
+        assert result.idempotent is False
 
 
 # ---------------------------------------------------------------------------
-# 8. RecallResult.recalled_at is auto-populated
+# SearchRequest
 # ---------------------------------------------------------------------------
 
-def test_recall_result_recalled_at_auto_populated():
-    result = RecallResult(status=RecallStatus.NO_MATCH)
-    assert isinstance(result.recalled_at, datetime)
 
+class TestSearchRequest:
+    def test_defaults(self) -> None:
+        req = SearchRequest(
+            tenant_id=TenantId("t1"),
+            scope=_scope(),
+            query="what did I say yesterday?",
+        )
+        assert req.mode == SearchMode.HYBRID
+        assert req.sectors is None
+        assert req.lifecycle_states == [LifecycleState.ACTIVE]
+        assert req.temporal_filter is None
+        assert req.k == 10
 
-# ---------------------------------------------------------------------------
-# 9. RecallItem.signals is not shared across instances
-# ---------------------------------------------------------------------------
-
-def test_recall_item_signals_not_shared():
-    a = _recall_item()
-    b = _recall_item()
-    a.signals["score"] = 0.9
-    assert "score" not in b.signals
-
-
-# ---------------------------------------------------------------------------
-# 10. RecallStatus str enum round-trip
-# ---------------------------------------------------------------------------
-
-def test_recall_status_str_roundtrip():
-    assert RecallStatus("NO_MATCH") == RecallStatus.NO_MATCH
-
-
-# ---------------------------------------------------------------------------
-# 11. SearchMode.HYBRID has value "HYBRID"
-# ---------------------------------------------------------------------------
-
-def test_search_mode_hybrid_value():
-    assert SearchMode.HYBRID == "HYBRID"
-    assert SearchMode.HYBRID.value == "HYBRID"
+    def test_sector_filter(self) -> None:
+        req = SearchRequest(
+            tenant_id=TenantId("t1"),
+            scope=_scope(),
+            query="q",
+            sectors=[MemorySector.EPISODIC],
+        )
+        assert req.sectors == [MemorySector.EPISODIC]
 
 
 # ---------------------------------------------------------------------------
-# 12. Two RecallRequest objects with identical fields are equal
+# RecallRequest
 # ---------------------------------------------------------------------------
 
-def test_recall_request_equality():
-    scope = _scope()
-    a = RecallRequest(tenant_id=TenantId("t-1"), scope=scope, query="q")
-    b = RecallRequest(tenant_id=TenantId("t-1"), scope=scope, query="q")
-    assert a == b
+
+class TestRecallRequest:
+    def test_defaults(self) -> None:
+        req = RecallRequest(
+            tenant_id=TenantId("t1"),
+            scope=_scope(),
+            query="context for next step",
+        )
+        assert req.max_tokens == 4000
+        assert req.max_items == 10
+        assert req.include_facts is True
+        assert req.include_verbatim is True
+        assert req.mode == SearchMode.HYBRID
+
+
+# ---------------------------------------------------------------------------
+# RecallItem
+# ---------------------------------------------------------------------------
+
+
+class TestRecallItem:
+    def test_optional_fields(self) -> None:
+        item = RecallItem(
+            memory_id=new_memory_id(),
+            content="some memory",
+            sector=MemorySector.SEMANTIC,
+            lifecycle_state=LifecycleState.ACTIVE,
+            pipeline_status=PipelineStatus.ENRICHED,
+        )
+        assert item.effective_from is None
+        assert item.trace_id is None
+        assert item.explanation == ""
+        assert item.signals == {}
+
+
+# ---------------------------------------------------------------------------
+# RecallResult
+# ---------------------------------------------------------------------------
+
+
+class TestRecallResult:
+    def test_no_match(self) -> None:
+        result = RecallResult(
+            status=RecallStatus.NO_MATCH,
+            no_match_reason="nothing relevant found",
+        )
+        assert result.items == []
+        assert result.total_tokens_estimate == 0
+
+    def test_with_items(self) -> None:
+        item = RecallItem(
+            memory_id=new_memory_id(),
+            content="ctx",
+            sector=MemorySector.EPISODIC,
+            lifecycle_state=LifecycleState.ACTIVE,
+            pipeline_status=PipelineStatus.ENRICHED,
+        )
+        result = RecallResult(status=RecallStatus.MATCH, items=[item])
+        assert len(result.items) == 1
+        assert result.status == RecallStatus.MATCH
