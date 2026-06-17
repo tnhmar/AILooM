@@ -1,4 +1,4 @@
-# memory-layer
+# AILooM
 
 **A framework-agnostic AI memory layer for production agentic systems.**
 
@@ -10,7 +10,7 @@
 
 ---
 
-`memory-layer` gives agents, assistants, and AI applications **persistent, explainable, auditable memory** without coupling to any specific framework. Plug it into LangGraph, call it from a raw OpenAI loop, deploy it as an MCP server, or embed it locally — the domain contracts never change.
+`AILooM` gives agents, assistants, and AI applications **persistent, explainable, auditable memory** without coupling to any specific framework. Plug it into LangGraph, call it from a raw OpenAI loop, deploy it as an MCP server, or embed it locally — the domain contracts never change.
 
 ```python
 from memory_layer import MemoryClient, WriteRequest, RecallRequest
@@ -33,11 +33,11 @@ if context.status == RecallStatus.NO_MATCH:
 
 ---
 
-## Why memory-layer?
+## Why AILooM?
 
-Existing memory systems trade off portability, temporal accuracy, privacy, or operational simplicity. `memory-layer` unifies the core concerns:
+Existing memory systems trade off portability, temporal accuracy, privacy, or operational simplicity. `AILooM` unifies the core concerns:
 
-| Concern | What memory-layer provides |
+| Concern | What AILooM provides |
 |---|---|
 | **Portability** | Pure ports-and-adapters architecture — no framework dependency in domain core |
 | **Temporal truth** | Explicit `effective_from` / `effective_to` on every fact; point-in-time queries |
@@ -50,7 +50,7 @@ Existing memory systems trade off portability, temporal accuracy, privacy, or op
 
 ## Architecture
 
-`memory-layer` follows **hexagonal (ports-and-adapters) architecture**. Domain core has zero external dependencies. Every integration — storage, embedding model, extraction service, framework adapter — is swappable via a typed `Protocol`.
+`AILooM` follows **hexagonal (ports-and-adapters) architecture**. Domain core has zero external dependencies. Every integration — storage, embedding model, extraction service, framework adapter — is swappable via a typed `Protocol`.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -238,7 +238,7 @@ Key events include `MEMORY_WRITTEN`, `MEMORY_ENRICHED`, `CONTRADICTION_DETECTED`
 
 ## Benchmarks
 
-`memory-layer` ships with a benchmark harness mapped to:
+`AILooM` ships with a benchmark harness mapped to:
 
 - **LongMemEval** — long-term recall quality (Recall@1, Recall@5, temporal correctness)
 - **LoCoMo** — long-horizon conversational memory (Recall@1, token budget adherence)
