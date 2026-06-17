@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
-from memory_layer.domain.events import MemoryEvent
-from memory_layer.domain.records import AuditEntry, Fact, MemoryRecord, Scope
 from memory_layer.domain.types import (
-    EntityId,
-    FactId,
     LifecycleState,
     MemoryId,
     MemorySector,
@@ -46,15 +41,23 @@ class _MinimalWrite:
 class _MinimalRepo:
     async def save(self, record: Any) -> None: ...
     async def get_by_id(self, memory_id: Any, tenant_id: Any) -> Any: ...
-    async def update_lifecycle(self, memory_id: Any, tenant_id: Any, state: Any, actor: Any) -> None: ...
-    async def update_pipeline_status(self, memory_id: Any, tenant_id: Any, status: Any) -> None: ...
-    async def list_by_scope(self, scope: Any, lifecycle_states: Any, limit: int = 100) -> Any: ...
+    async def update_lifecycle(
+        self, memory_id: Any, tenant_id: Any, state: Any, actor: Any
+    ) -> None: ...
+    async def update_pipeline_status(
+        self, memory_id: Any, tenant_id: Any, status: Any
+    ) -> None: ...
+    async def list_by_scope(
+        self, scope: Any, lifecycle_states: Any, limit: int = 100
+    ) -> Any: ...
     async def get_by_idempotency_key(self, key: Any, tenant_id: Any) -> Any: ...
 
 
 class _MinimalVectorIndex:
     async def upsert(self, doc: Any) -> None: ...
-    async def search(self, query_embedding: Any, tenant_id: Any, k: Any, filters: Any) -> Any: ...
+    async def search(
+        self, query_embedding: Any, tenant_id: Any, k: Any, filters: Any
+    ) -> Any: ...
     async def delete(self, memory_id: Any, tenant_id: Any) -> None: ...
 
 
@@ -65,6 +68,7 @@ class _MinimalObserver:
 class _MinimalEmbedding:
     model_id: str = "text-embedding-3-small"
     dimensions: int = 1536
+
     async def embed(self, texts: Any) -> Any: ...
 
 
