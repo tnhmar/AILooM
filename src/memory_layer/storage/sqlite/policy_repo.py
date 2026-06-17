@@ -135,7 +135,8 @@ class SqliteTenantPolicyRepository:
         StorageError
             On unexpected database errors.
         """
-        sql = "SELECT policies_json FROM tenant_policies WHERE tenant_id = ?"
+        # Column is named 'policies' in the schema (V1__initial_schema.sql)
+        sql = "SELECT policies FROM tenant_policies WHERE tenant_id = ?"
         try:
             async with aiosqlite.connect(self._db_path) as db:
                 db.row_factory = aiosqlite.Row
@@ -147,7 +148,7 @@ class SqliteTenantPolicyRepository:
 
         if row is None:
             return TenantPolicies()
-        return self._from_json(row["policies_json"])
+        return self._from_json(row["policies"])
 
     async def save(self, tenant_id: TenantId, policies: TenantPolicies) -> None:
         """Persist *policies* for *tenant_id*.  Idempotent (upsert).
@@ -157,9 +158,10 @@ class SqliteTenantPolicyRepository:
         StorageError
             On unexpected database errors.
         """
+        # Column is named 'policies' in the schema (V1__initial_schema.sql)
         sql = """
-            INSERT OR REPLACE INTO tenant_policies (tenant_id, policies_json)
-            VALUES (?, ?)
+            INSERT OR REPLACE INTO tenant_policies (tenant_id, policies, updated_at)
+            VALUES (?, ?, datetime('now'))
         """
         try:
             async with aiosqlite.connect(self._db_path) as db:

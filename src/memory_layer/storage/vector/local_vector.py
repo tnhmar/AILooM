@@ -199,14 +199,22 @@ class ChromaVectorIndex:
         # Remove routing keys from the ChromaDB where clause — they are not
         # stored as searchable metadata fields by default.
         chroma_where = {
-            k: v for k, v in where.items() if k not in ("embedding_dimensions",)
+            k_: v for k_, v in where.items() if k_ not in ("embedding_dimensions",)
         }
 
         def _sync() -> list[VectorSearchResult]:
             collection = self._get_collection(str(tenant_id), model_id, dimensions)
+
+            # ChromaDB raises if n_results > number of documents in the
+            # collection.  Clamp to avoid this error on small/empty collections.
+            n_docs = collection.count()
+            n_results = max(1, min(k, n_docs)) if n_docs > 0 else 0
+            if n_results == 0:
+                return []
+
             results = collection.query(
                 query_embeddings=cast(list[Sequence[float]], [query_embedding]),
-                n_results=k,
+                n_results=n_results,
                 where=chroma_where if len(chroma_where) > 1 else {"tenant_id": str(tenant_id)},
                 include=["documents", "metadatas", "distances"],
             )
