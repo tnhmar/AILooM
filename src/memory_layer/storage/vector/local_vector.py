@@ -19,9 +19,10 @@ from __future__ import annotations
 
 import asyncio
 import re
-from typing import Any
+from typing import Any, Sequence, cast
 
 import chromadb
+from chromadb.api import ClientAPI
 
 from memory_layer.domain.exceptions import StorageError
 from memory_layer.domain.types import MemoryId, TenantId
@@ -70,7 +71,7 @@ class ChromaVectorIndex:
         Directory used by the ChromaDB persistent client.  Ignored when
         *chroma_settings* provides an ephemeral or custom client.
     chroma_settings:
-        Optional pre-built ``chromadb.Client`` instance.  Pass a client
+        Optional pre-built ``ClientAPI`` instance.  Pass a client
         created with ``chromadb.EphemeralClient()`` in tests to avoid
         disk I/O entirely.
     """
@@ -78,10 +79,10 @@ class ChromaVectorIndex:
     def __init__(
         self,
         persist_directory: str = "./chroma_data",
-        chroma_settings: chromadb.ClientAPI | None = None,
+        chroma_settings: ClientAPI | None = None,
     ) -> None:
         if chroma_settings is not None:
-            self._client: chromadb.ClientAPI = chroma_settings
+            self._client: ClientAPI = chroma_settings
         else:
             self._client = chromadb.PersistentClient(path=persist_directory)
 
@@ -139,7 +140,7 @@ class ChromaVectorIndex:
             )
             collection.upsert(
                 ids=[str(doc.memory_id)],
-                embeddings=[doc.embedding],
+                embeddings=cast(list[Sequence[float]], [doc.embedding]),
                 documents=[doc.content],
                 metadatas=[flat_meta],
             )
@@ -203,7 +204,7 @@ class ChromaVectorIndex:
         def _sync() -> list[VectorSearchResult]:
             collection = self._get_collection(str(tenant_id), model_id, dimensions)
             results = collection.query(
-                query_embeddings=[query_embedding],
+                query_embeddings=cast(list[Sequence[float]], [query_embedding]),
                 n_results=k,
                 where=chroma_where if len(chroma_where) > 1 else {"tenant_id": str(tenant_id)},
                 include=["documents", "metadatas", "distances"],
