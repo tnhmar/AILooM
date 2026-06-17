@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import typer
+from fastapi import FastAPI
 
 cli = typer.Typer(name="memory-layer", help="memory-layer: AI memory layer CLI.")
 
@@ -25,10 +26,8 @@ def serve(
     )
 
 
-def create_app() -> "FastAPI":
+def create_app() -> FastAPI:
     """FastAPI application factory — wires routes, middleware, and lifecycle hooks."""
-    from fastapi import FastAPI
-
     app = FastAPI(
         title="memory-layer",
         version="0.1.0",
