@@ -42,12 +42,12 @@ def test_ensure_schema_returns_connection() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 2. After ensure_schema, get_current_version returns 1
+# 2. After ensure_schema, get_current_version returns the latest migration
 # ---------------------------------------------------------------------------
 
 def test_current_version_after_ensure_schema() -> None:
     conn = ensure_schema(":memory:")
-    assert get_current_version(conn) == 1
+    assert get_current_version(conn) == 2
     conn.close()
 
 
@@ -60,7 +60,7 @@ def test_ensure_schema_idempotent(tmp_path: pytest.TempPathFactory) -> None:
     conn1 = ensure_schema(db_path)
     conn1.close()
     conn2 = ensure_schema(db_path)
-    assert get_current_version(conn2) == 1
+    assert get_current_version(conn2) == 2
     conn2.close()
 
 

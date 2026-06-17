@@ -29,6 +29,10 @@ from memory_layer.domain.exceptions import StorageError
 from memory_layer.domain.types import MemoryId, TenantId
 from memory_layer.ports.outbound import VectorDocument, VectorSearchResult
 
+# Keys that are used for collection routing only — never passed to ChromaDB
+# as metadata filter conditions.
+_ROUTING_KEYS = frozenset({"embedding_model_id", "embedding_dimensions"})
+
 
 # ---------------------------------------------------------------------------
 # Collection naming  (ADR-007)
@@ -56,6 +60,37 @@ def _collection_name(tenant_id: str, model_id: str) -> str:
     tenant_short = re.sub(r"[^a-z0-9]", "", tenant_id.lower())[:8]
     model_slug = re.sub(r"[^a-zA-Z0-9]", "_", model_id)
     return f"memory_vectors_{tenant_short}_{model_slug}"
+
+
+def _build_chroma_where(filters: dict[str, Any], tenant_id: str) -> dict[str, Any]:
+    """Build a ChromaDB-compatible ``where`` clause.
+
+    ChromaDB's ``validate_where`` requires **exactly one top-level key**.  When
+    multiple conditions are needed they must be wrapped in ``{"$and": [...]}``,
+    where each element is a single-key equality expression
+    ``{"field": {"$eq": value}}``.
+
+    The ``tenant_id`` guard is always included.  Routing-only keys
+    (``embedding_model_id``, ``embedding_dimensions``) are excluded because
+    they are stored as metadata but are **not** reliable search filters across
+    collections already scoped to a single model.
+    """
+    # Build the list of conditions as {field: {$eq: value}} dicts.
+    conditions: list[dict[str, Any]] = [
+        {"tenant_id": {"$eq": tenant_id}},
+    ]
+    for key, value in filters.items():
+        if key in _ROUTING_KEYS:
+            continue
+        if key == "tenant_id":
+            continue  # already added above
+        conditions.append({key: {"$eq": value}})
+
+    if len(conditions) == 1:
+        # Single condition — ChromaDB accepts the bare dict directly.
+        return {"tenant_id": {"$eq": tenant_id}}
+
+    return {"$and": conditions}
 
 
 # ---------------------------------------------------------------------------
@@ -187,35 +222,24 @@ class ChromaVectorIndex:
         StorageError
             On unexpected ChromaDB errors.
         """
-        # Merge caller filters with mandatory tenant isolation guard.
-        where: dict[str, Any] = {**filters, "tenant_id": str(tenant_id)}
-
-        # model_id is required to route to the right collection.  Callers
-        # should pass it via filters["embedding_model_id"]; fall back to a
-        # sentinel that will simply return no results from any collection.
         model_id: str = filters.get("embedding_model_id", "__unknown__")
         dimensions: int = filters.get("embedding_dimensions", len(query_embedding))
-
-        # Remove routing keys from the ChromaDB where clause — they are not
-        # stored as searchable metadata fields by default.
-        chroma_where = {
-            k_: v for k_, v in where.items() if k_ not in ("embedding_dimensions",)
-        }
+        chroma_where = _build_chroma_where(filters, str(tenant_id))
 
         def _sync() -> list[VectorSearchResult]:
             collection = self._get_collection(str(tenant_id), model_id, dimensions)
 
             # ChromaDB raises if n_results > number of documents in the
-            # collection.  Clamp to avoid this error on small/empty collections.
+            # collection.  Clamp to avoid this on small/empty collections.
             n_docs = collection.count()
-            n_results = max(1, min(k, n_docs)) if n_docs > 0 else 0
+            n_results = min(k, n_docs)
             if n_results == 0:
                 return []
 
             results = collection.query(
                 query_embeddings=cast(list[Sequence[float]], [query_embedding]),
                 n_results=n_results,
-                where=chroma_where if len(chroma_where) > 1 else {"tenant_id": str(tenant_id)},
+                where=chroma_where,
                 include=["documents", "metadatas", "distances"],
             )
 
@@ -259,17 +283,15 @@ class ChromaVectorIndex:
         prefix = f"memory_vectors_{tenant_short}_"
 
         def _sync() -> None:
-            # Discover all collections for this tenant (handles multi-model case).
             all_collections = self._client.list_collections()
             for col_meta in all_collections:
                 name = col_meta.name if hasattr(col_meta, "name") else str(col_meta)
                 if not name.startswith(prefix):
                     continue
                 col = self._client.get_collection(name)
-                # Only delete if the doc actually belongs to this tenant.
                 existing = col.get(
                     ids=[str(memory_id)],
-                    where={"tenant_id": str(tenant_id)},
+                    where={"tenant_id": {"$eq": str(tenant_id)}},
                     include=[],
                 )
                 if existing["ids"]:
