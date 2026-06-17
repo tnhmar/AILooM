@@ -69,15 +69,15 @@ def get_current_version(conn: sqlite3.Connection) -> int:
 def run_migrations(conn: sqlite3.Connection) -> list[int]:
     """Discover and apply all pending migrations in version order.
 
-    Each migration is wrapped in its own transaction so a failure at version N
-    does not corrupt earlier applied versions.
+    Each migration SQL is executed via ``executescript``, which issues an
+    implicit COMMIT before running and therefore manages its own transaction.
+    The ``schema_version`` bookkeeping INSERT is committed in a separate
+    explicit transaction immediately after.
 
     Parameters
     ----------
     conn:
-        An open ``sqlite3.Connection``.  ``isolation_level`` is temporarily set
-        to ``None`` (autocommit) so that each migration controls its own
-        ``BEGIN`` / ``COMMIT`` / ``ROLLBACK``.
+        An open ``sqlite3.Connection``.
 
     Returns
     -------
@@ -107,34 +107,28 @@ def run_migrations(conn: sqlite3.Connection) -> list[int]:
         raise SchemaVersionError(expected=known_max, found=current)
 
     applied: list[int] = []
-    old_isolation = conn.isolation_level
-    conn.isolation_level = None  # manual transaction control
 
-    try:
-        for version, path in migration_files:
-            if version <= current:
-                continue
+    for version, path in migration_files:
+        if version <= current:
+            continue
 
-            sql = path.read_text(encoding="utf-8")
-            now = datetime.now(UTC).isoformat()
+        sql = path.read_text(encoding="utf-8")
+        now = datetime.now(UTC).isoformat()
 
-            conn.execute("BEGIN")
-            try:
-                conn.executescript(sql)
-                # executescript implicitly commits; record version in its own statement.
-                conn.execute(
-                    "INSERT INTO schema_version"
-                    " (version, description, applied_at) VALUES (?, ?, ?)",
-                    (version, path.stem, now),
-                )
-                conn.execute("COMMIT")
-            except Exception:
-                conn.execute("ROLLBACK")
-                raise
+        # executescript() issues an implicit COMMIT before execution, so we
+        # must NOT wrap it in BEGIN/COMMIT ourselves — that causes
+        # "cannot commit - no transaction is active" on the outer COMMIT.
+        conn.executescript(sql)
 
-            applied.append(version)
-    finally:
-        conn.isolation_level = old_isolation
+        # Record the applied version in its own explicit transaction.
+        with conn:
+            conn.execute(
+                "INSERT INTO schema_version"
+                " (version, description, applied_at) VALUES (?, ?, ?)",
+                (version, path.stem, now),
+            )
+
+        applied.append(version)
 
     return applied
 
