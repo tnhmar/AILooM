@@ -1,1 +1,1 @@
-"""Local vector index adapter package using ChromaDB for single-node deployments."""
+"""Vector storage adapter package."""
