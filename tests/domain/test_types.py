@@ -137,5 +137,12 @@ class TestExceptionHierarchy:
             raise StorageError("disk full")
 
     def test_raise_tenant_isolation(self) -> None:
-        with pytest.raises(TenantIsolationViolation):
-            raise TenantIsolationViolation("cross-tenant access")
+        with pytest.raises(TenantIsolationViolation) as exc_info:
+            raise TenantIsolationViolation(
+                actor="agent-x",
+                requested_tenant_id="tenant-b",
+            )
+        assert exc_info.value.actor == "agent-x"
+        assert exc_info.value.requested_tenant_id == "tenant-b"
+        assert "agent-x" in str(exc_info.value)
+        assert "tenant-b" in str(exc_info.value)
