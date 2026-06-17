@@ -22,7 +22,6 @@ import re
 from typing import Any
 
 import chromadb
-from chromadb.config import Settings
 
 from memory_layer.domain.exceptions import StorageError
 from memory_layer.domain.types import MemoryId, TenantId
