@@ -1,0 +1,2 @@
+-- V1: initial schema for memory-layer SQLite local adapter
+-- Tables: memory_records, facts, audit_log, memory_traces
