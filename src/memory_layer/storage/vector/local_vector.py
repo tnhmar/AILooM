@@ -24,6 +24,7 @@ from typing import Any, cast
 
 import chromadb
 from chromadb.api import ClientAPI
+from chromadb.api.types import Where
 
 from memory_layer.domain.exceptions import StorageError
 from memory_layer.domain.types import MemoryId, TenantId
@@ -62,7 +63,7 @@ def _collection_name(tenant_id: str, model_id: str) -> str:
     return f"memory_vectors_{tenant_short}_{model_slug}"
 
 
-def _build_chroma_where(filters: dict[str, Any], tenant_id: str) -> dict[str, Any]:
+def _build_chroma_where(filters: dict[str, Any], tenant_id: str) -> Where:
     """Build a ChromaDB-compatible ``where`` clause.
 
     ChromaDB's ``validate_where`` requires **exactly one top-level key**.  When
@@ -88,9 +89,9 @@ def _build_chroma_where(filters: dict[str, Any], tenant_id: str) -> dict[str, An
 
     if len(conditions) == 1:
         # Single condition — ChromaDB accepts the bare dict directly.
-        return {"tenant_id": {"$eq": tenant_id}}
+        return cast(Where, {"tenant_id": {"$eq": tenant_id}})
 
-    return {"$and": conditions}
+    return cast(Where, {"$and": conditions})
 
 
 # ---------------------------------------------------------------------------
@@ -224,7 +225,7 @@ class ChromaVectorIndex:
         """
         model_id: str = filters.get("embedding_model_id", "__unknown__")
         dimensions: int = filters.get("embedding_dimensions", len(query_embedding))
-        chroma_where = _build_chroma_where(filters, str(tenant_id))
+        chroma_where: Where = _build_chroma_where(filters, str(tenant_id))
 
         def _sync() -> list[VectorSearchResult]:
             collection = self._get_collection(str(tenant_id), model_id, dimensions)
@@ -281,6 +282,7 @@ class ChromaVectorIndex:
         """
         tenant_short = re.sub(r"[^a-z0-9]", "", str(tenant_id).lower())[:8]
         prefix = f"memory_vectors_{tenant_short}_"
+        tenant_where: Where = cast(Where, {"tenant_id": {"$eq": str(tenant_id)}})
 
         def _sync() -> None:
             all_collections = self._client.list_collections()
@@ -291,7 +293,7 @@ class ChromaVectorIndex:
                 col = self._client.get_collection(name)
                 existing = col.get(
                     ids=[str(memory_id)],
-                    where={"tenant_id": {"$eq": str(tenant_id)}},
+                    where=tenant_where,
                     include=[],
                 )
                 if existing["ids"]:
