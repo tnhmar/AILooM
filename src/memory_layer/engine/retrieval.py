@@ -120,7 +120,7 @@ class RetrievalService:
         # 1. Embed if needed.
         embedding: list[float] = []
         if IndexTarget.VECTOR in targets:
-            vectors = await self._embedding.embed([request.query_text])
+            vectors = await self._embedding.embed([request.query])
             embedding = vectors[0]
 
         # 2. Build coroutines for each target.
@@ -192,7 +192,7 @@ class RetrievalService:
         request: SearchRequest,
     ) -> list[str]:
         results = await self._full_text.search(
-            query=request.query_text,
+            query=request.query,
             tenant_id=request.tenant_id,
             k=plan.k_per_index,
             filters={},
@@ -225,8 +225,8 @@ def _extract_rrf_weights(
     target_key_map: dict[IndexTarget, str] = {
         IndexTarget.VECTOR: "semantic_weight",
         IndexTarget.FULL_TEXT: "keyword_weight",
-        IndexTarget.GRAPH: "graph_weight",
-        IndexTarget.TEMPORAL: "temporal_weight",
+        IndexTarget.GRAPH: "entity_weight",
+        IndexTarget.TEMPORAL: "recency_weight",
     }
     out: list[float] = []
     for t in coro_targets:
@@ -242,7 +242,7 @@ def _build_items(
     """Construct :class:`SearchResultItem` objects from RRF-fused IDs."""
     items: list[SearchResultItem] = []
     for memory_id_str, score in fused:
-        mid = MemoryId(memory_id_str)  # type: ignore[call-arg]
+        mid = MemoryId(memory_id_str)
         items.append(
             SearchResultItem(
                 memory_id=mid,

@@ -100,7 +100,7 @@ class DefaultQueryPlanner:
             When ``request.mode`` is ``GRAPH`` and ``graph_available`` is ``False``.
         """
         mode = request.mode
-        final_k: int = getattr(request, "top_k", 10) or 10
+        final_k: int = getattr(request, "k", 10) or 10
         k_per_index = max(final_k * 3, 20)
 
         if mode == SearchMode.SEMANTIC:
@@ -143,14 +143,14 @@ class DefaultQueryPlanner:
             w = {
                 "semantic_weight": weights.semantic_weight,
                 "keyword_weight": weights.keyword_weight,
-                "temporal_weight": weights.temporal_weight,
+                "recency_weight": weights.recency_weight,
             }
             use_rerank = False
             explanation = (
                 "HYBRID_TEMPORAL mode: RRF fusion of vector + full-text + temporal decay; "
                 f"semantic={weights.semantic_weight}, "
                 f"keyword={weights.keyword_weight}, "
-                f"temporal={weights.temporal_weight}."
+                f"recency={weights.recency_weight}."
             )
 
         elif mode == SearchMode.QUALITY:
@@ -162,14 +162,14 @@ class DefaultQueryPlanner:
             w = {
                 "semantic_weight": weights.semantic_weight,
                 "keyword_weight": weights.keyword_weight,
-                "temporal_weight": weights.temporal_weight,
+                "recency_weight": weights.recency_weight,
             }
             use_rerank = True
             explanation = (
                 "QUALITY mode: full RRF fusion + LLM rerank for highest precision; "
                 f"semantic={weights.semantic_weight}, "
                 f"keyword={weights.keyword_weight}, "
-                f"temporal={weights.temporal_weight}."
+                f"recency={weights.recency_weight}."
             )
 
         elif mode == SearchMode.GRAPH:
@@ -178,11 +178,11 @@ class DefaultQueryPlanner:
                     "GRAPH search mode requested but no graph index is available."
                 )
             targets = [IndexTarget.GRAPH]
-            w = {"graph_weight": weights.graph_weight}
+            w = {"entity_weight": weights.entity_weight}
             use_rerank = False
             explanation = (
                 "GRAPH mode: graph traversal search; "
-                f"graph_weight={weights.graph_weight}."
+                f"entity_weight={weights.entity_weight}."
             )
 
         else:
