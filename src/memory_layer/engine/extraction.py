@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
-from typing import Any, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from memory_layer.domain.events import (
     ContradictionDetectedEvent,
@@ -23,7 +23,6 @@ from memory_layer.domain.types import (
     EntityId,
     FactId,
     LifecycleState,
-    MemoryId,
     new_fact_id,
 )
 from memory_layer.ports.outbound import (
@@ -66,7 +65,8 @@ Return [] if no facts. Return ONLY valid JSON.
 
 class LLMExtractionService:
     """Concrete :class:`~memory_layer.ports.outbound.ExtractionPort` that uses
-    an LLM to extract structured facts from a :class:`~memory_layer.domain.records.MemoryRecord`.
+    an LLM to extract structured facts from a
+    :class:`~memory_layer.domain.records.MemoryRecord`.
 
     Extraction flow
     ---------------
@@ -105,7 +105,7 @@ class LLMExtractionService:
         llm_client: LLMClientPort,
         fact_repo: FactRepositoryPort,
         observer: ObserverPort,
-        policy: Optional[ConflictResolutionPolicy] = None,
+        policy: ConflictResolutionPolicy | None = None,
     ) -> None:
         self._llm = llm_client
         self._fact_repo = fact_repo
@@ -118,7 +118,9 @@ class LLMExtractionService:
 
     async def extract(self, record: MemoryRecord) -> ExtractionResult:
         """Extract facts from *record* and return an :class:`ExtractionResult`."""
-        user_prompt = f"Extract facts from the following text:\n\n{record.raw_payload}"
+        user_prompt = (
+            f"Extract facts from the following text:\n\n{record.raw_payload}"
+        )
 
         try:
             raw_response = await self._llm.complete(

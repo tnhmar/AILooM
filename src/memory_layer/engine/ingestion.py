@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime
-from typing import Optional
 
 from memory_layer.domain.events import (
     EnrichmentFailedEvent,
@@ -32,7 +31,6 @@ from memory_layer.domain.types import (
     PipelineStatus,
     new_audit_id,
     new_memory_id,
-    new_trace_id,
 )
 from memory_layer.ports.outbound import (
     AuditLogPort,
@@ -104,7 +102,7 @@ class WriteMemoryService:
         record_repo: MemoryRecordRepositoryPort,
         audit_log: AuditLogPort,
         observer: ObserverPort,
-        extraction: Optional[ExtractionPort] = None,
+        extraction: ExtractionPort | None = None,
     ) -> None:
         self._record_repo = record_repo
         self._audit_log = audit_log

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -18,7 +18,6 @@ from memory_layer.domain.records import Fact, MemoryRecord, MemorySector, Scope
 from memory_layer.domain.types import (
     EntityId,
     LifecycleState,
-    MemoryId,
     PayloadType,
     PipelineStatus,
     PrincipalType,
@@ -27,7 +26,6 @@ from memory_layer.domain.types import (
     new_memory_id,
 )
 from memory_layer.engine.extraction import LLMExtractionService
-from memory_layer.ports.outbound import ExtractionResult
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +61,7 @@ def _make_raw_fact(
     object_value: str = "dark mode",
     confidence: float = 0.9,
     sector: str = "SEMANTIC",
-) -> dict:
+) -> dict:  # type: ignore[type-arg]
     return {
         "subject_entity_id": entity,
         "predicate": predicate,
@@ -119,7 +117,12 @@ def _existing_fact(entity: str = "user-1", predicate_group: str = "preference") 
 # 1. Valid JSON with 2 facts returns 2 facts
 @pytest.mark.asyncio
 async def test_two_facts_extracted() -> None:
-    raw = json.dumps([_make_raw_fact(), _make_raw_fact(predicate="dislikes", predicate_group="dislike")])
+    raw = json.dumps(
+        [
+            _make_raw_fact(),
+            _make_raw_fact(predicate="dislikes", predicate_group="dislike"),
+        ]
+    )
     svc, *_ = _make_service(llm_response=raw)
     result = await svc.extract(_make_record())
     assert len(result.facts) == 2
@@ -148,7 +151,9 @@ async def test_invalid_json_sets_error() -> None:
 # 4. fact_repo.save called once per fact
 @pytest.mark.asyncio
 async def test_fact_repo_save_called_per_fact() -> None:
-    raw = json.dumps([_make_raw_fact(), _make_raw_fact(predicate="uses", predicate_group="tool")])
+    raw = json.dumps(
+        [_make_raw_fact(), _make_raw_fact(predicate="uses", predicate_group="tool")]
+    )
     svc, _, fact_repo, _ = _make_service(llm_response=raw)
     await svc.extract(_make_record())
     assert fact_repo.save.await_count == 2
@@ -170,7 +175,9 @@ async def test_high_confidence_contradiction_emits_event() -> None:
     raw = json.dumps([_make_raw_fact(confidence=0.9)])
     policy = ConflictResolutionPolicy(low_confidence_threshold=0.6)
     existing = [_existing_fact()]
-    svc, _, _, observer = _make_service(llm_response=raw, existing_facts=existing, policy=policy)
+    svc, _, _, observer = _make_service(
+        llm_response=raw, existing_facts=existing, policy=policy
+    )
     await svc.extract(_make_record())
     emitted_types = [type(c[0][0]) for c in observer.emit.call_args_list]
     assert ContradictionDetectedEvent in emitted_types
@@ -182,7 +189,9 @@ async def test_high_confidence_calls_close_fact() -> None:
     raw = json.dumps([_make_raw_fact(confidence=0.9)])
     policy = ConflictResolutionPolicy(low_confidence_threshold=0.6)
     existing = [_existing_fact()]
-    svc, _, fact_repo, _ = _make_service(llm_response=raw, existing_facts=existing, policy=policy)
+    svc, _, fact_repo, _ = _make_service(
+        llm_response=raw, existing_facts=existing, policy=policy
+    )
     await svc.extract(_make_record())
     fact_repo.close_fact.assert_awaited_once()
 
@@ -193,7 +202,9 @@ async def test_low_confidence_emits_low_confidence_event() -> None:
     raw = json.dumps([_make_raw_fact(confidence=0.4)])
     policy = ConflictResolutionPolicy(low_confidence_threshold=0.6)
     existing = [_existing_fact()]
-    svc, _, _, observer = _make_service(llm_response=raw, existing_facts=existing, policy=policy)
+    svc, _, _, observer = _make_service(
+        llm_response=raw, existing_facts=existing, policy=policy
+    )
     await svc.extract(_make_record())
     emitted_types = [type(c[0][0]) for c in observer.emit.call_args_list]
     assert ContradictionLowConfidenceEvent in emitted_types
@@ -205,7 +216,9 @@ async def test_low_confidence_fact_saved_as_proposed() -> None:
     raw = json.dumps([_make_raw_fact(confidence=0.4)])
     policy = ConflictResolutionPolicy(low_confidence_threshold=0.6)
     existing = [_existing_fact()]
-    svc, _, fact_repo, _ = _make_service(llm_response=raw, existing_facts=existing, policy=policy)
+    svc, _, fact_repo, _ = _make_service(
+        llm_response=raw, existing_facts=existing, policy=policy
+    )
     await svc.extract(_make_record())
     saved_fact: Fact = fact_repo.save.call_args[0][0]
     assert saved_fact.lifecycle_state == LifecycleState.PROPOSED
