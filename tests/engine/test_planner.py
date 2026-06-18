@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 
 from memory_layer.domain.exceptions import CapabilityNotAvailableError
@@ -16,7 +18,6 @@ from memory_layer.domain.types import PrincipalType, TenantId
 from memory_layer.engine.planner import (
     DefaultQueryPlanner,
     IndexTarget,
-    QueryPlan,
     QueryPlannerPort,
 )
 
@@ -34,7 +35,11 @@ _WEIGHTS = SearchWeightsPolicy()
 _PLANNER = DefaultQueryPlanner()
 
 
-def _req(mode: SearchMode, top_k: int = 10, temporal_filter: TemporalFilter | None = None) -> SearchRequest:
+def _req(
+    mode: SearchMode,
+    top_k: int = 10,
+    temporal_filter: TemporalFilter | None = None,
+) -> SearchRequest:
     return SearchRequest(
         tenant_id=TENANT,
         scope=_SCOPE,
@@ -142,10 +147,13 @@ def test_explanation_non_empty(mode: SearchMode, graph_available: bool) -> None:
 
 # 12. temporal_filter from request is propagated to QueryPlan
 def test_temporal_filter_propagated() -> None:
-    from datetime import datetime, timezone
     tf = TemporalFilter(
-        after=datetime(2025, 1, 1, tzinfo=timezone.utc),
-        before=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        after=datetime(2025, 1, 1, tzinfo=UTC),
+        before=datetime(2026, 1, 1, tzinfo=UTC),
     )
-    plan = _PLANNER.plan(_req(SearchMode.HYBRID_TEMPORAL, temporal_filter=tf), _WEIGHTS, graph_available=False)
+    plan = _PLANNER.plan(
+        _req(SearchMode.HYBRID_TEMPORAL, temporal_filter=tf),
+        _WEIGHTS,
+        graph_available=False,
+    )
     assert plan.temporal_filter is tf

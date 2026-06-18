@@ -8,9 +8,9 @@ No I/O whatsoever.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Optional, Protocol, runtime_checkable
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Protocol, runtime_checkable
 
 from memory_layer.domain.exceptions import CapabilityNotAvailableError
 from memory_layer.domain.policies import SearchWeightsPolicy
@@ -22,7 +22,7 @@ from memory_layer.domain.records import SearchMode, SearchRequest, TemporalFilte
 # ---------------------------------------------------------------------------
 
 
-class IndexTarget(str, Enum):
+class IndexTarget(StrEnum):
     VECTOR = "VECTOR"
     FULL_TEXT = "FULL_TEXT"
     GRAPH = "GRAPH"
@@ -42,7 +42,7 @@ class QueryPlan:
     targets: list[IndexTarget]
     weights: dict[str, float]
     use_llm_rerank: bool = False
-    temporal_filter: Optional[TemporalFilter] = None
+    temporal_filter: TemporalFilter | None = None
     k_per_index: int = 20
     final_k: int = 10
     explanation: str = ""

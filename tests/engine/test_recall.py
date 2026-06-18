@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -66,7 +65,9 @@ def _recall_req(
     )
 
 
-def _make_item(mid: str = "m1", score: float = 0.9, content: str = "hello world") -> SearchResultItem:
+def _make_item(
+    mid: str = "m1", score: float = 0.9, content: str = "hello world"
+) -> SearchResultItem:
     return SearchResultItem(
         memory_id=MemoryId(mid),  # type: ignore[call-arg]
         content=content,
@@ -93,7 +94,9 @@ def _make_search_service(
     )
 
     retrieval = AsyncMock()
-    retrieval.retrieve.return_value = SearchResult(items=items, total=len(items), query_plan=plan)
+    retrieval.retrieve.return_value = SearchResult(
+        items=items, total=len(items), query_plan=plan
+    )
 
     planner = MagicMock(spec=DefaultQueryPlanner)
     planner.plan.return_value = plan
@@ -183,13 +186,11 @@ async def test_respects_max_items() -> None:
 # 8. Respects max_tokens budget
 @pytest.mark.asyncio
 async def test_respects_max_tokens() -> None:
-    # Each item has a 100-word content; estimate ≈ 130 tokens each.
     long_content = " ".join(["word"] * 100)
     items = [_make_item(f"m{i}", content=long_content) for i in range(10)]
     search_svc, *_ = _make_search_service(items=items)
     observer = AsyncMock()
     recall_svc = RecallMemoryService(search_service=search_svc, observer=observer)
-    # Budget of 200 tokens should allow only 1 item (130 tokens), not 2 (260).
     result = await recall_svc.execute(_recall_req(max_items=10, max_tokens=200))
     assert result.total_tokens_estimate <= 200
 
@@ -223,7 +224,6 @@ async def test_status_match_when_all_items_filled() -> None:
     search_svc, *_ = _make_search_service(items=items)
     observer = AsyncMock()
     recall_svc = RecallMemoryService(search_service=search_svc, observer=observer)
-    # max_items=3, items available=5 → exactly 3 returned → MATCH
     result = await recall_svc.execute(_recall_req(max_items=3, max_tokens=None))
     assert result.status == RecallStatus.MATCH
 
@@ -231,12 +231,11 @@ async def test_status_match_when_all_items_filled() -> None:
 # 12. status=PARTIAL_MATCH when token budget cuts short
 @pytest.mark.asyncio
 async def test_status_partial_match_on_token_cut() -> None:
-    long_content = " ".join(["word"] * 200)  # ~260 tokens each
+    long_content = " ".join(["word"] * 200)
     items = [_make_item(f"m{i}", content=long_content) for i in range(5)]
     search_svc, *_ = _make_search_service(items=items)
     observer = AsyncMock()
     recall_svc = RecallMemoryService(search_service=search_svc, observer=observer)
-    # Budget of 300 tokens: first item ~260, second would exceed.
     result = await recall_svc.execute(_recall_req(max_items=5, max_tokens=300))
     assert result.status == RecallStatus.PARTIAL_MATCH
 

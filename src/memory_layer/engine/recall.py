@@ -24,7 +24,7 @@ from memory_layer.domain.records import (
 from memory_layer.domain.types import new_trace_id
 from memory_layer.engine.planner import DefaultQueryPlanner
 from memory_layer.engine.retrieval import RetrievalService
-from memory_layer.ports.inbound import SearchMemoryUseCase, SearchResult
+from memory_layer.ports.inbound import SearchResult
 from memory_layer.ports.outbound import ObserverPort, TenantPolicyRepositoryPort
 
 log = logging.getLogger(__name__)
@@ -206,7 +206,7 @@ class RecallMemoryService:
             status = RecallStatus.PARTIAL_MATCH
         elif len(items) == request.max_items:
             status = RecallStatus.MATCH
-        elif items:  # fewer than max_items but no token cut → all available
+        elif items:
             status = RecallStatus.MATCH
         else:
             status = RecallStatus.NO_MATCH
@@ -232,5 +232,5 @@ class RecallMemoryService:
         )
 
     def _estimate_tokens(self, text: str) -> int:
-        """Rough token estimate: word-count × 1.3 (matches GPT-4 sub-word inflation)."""
+        """Rough token estimate: word-count × 1.3."""
         return int(len(text.split()) * 1.3)

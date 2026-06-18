@@ -12,6 +12,7 @@ import logging
 from typing import Any
 
 from memory_layer.domain.exceptions import CapabilityNotAvailableError
+from memory_layer.domain.records import SearchRequest
 from memory_layer.domain.types import LifecycleState, MemoryId, MemorySector, PipelineStatus
 from memory_layer.engine.planner import IndexTarget, QueryPlan
 from memory_layer.ports.inbound import SearchResult, SearchResultItem
@@ -21,7 +22,6 @@ from memory_layer.ports.outbound import (
     GraphPort,
     VectorIndexPort,
 )
-from memory_layer.domain.records import SearchRequest
 
 log = logging.getLogger(__name__)
 
@@ -153,8 +153,8 @@ class RetrievalService:
         # 5. Trim to final_k.
         fused = fused[: plan.final_k]
 
-        # 6. Build result items (scores come from RRF, content from index cache).
-        items = _build_items(fused, raw_results, coro_targets, plan)
+        # 6. Build result items.
+        items = _build_items(fused, plan)
 
         # 7. LLM rerank stub.
         if plan.use_llm_rerank:
@@ -204,9 +204,6 @@ class RetrievalService:
         plan: QueryPlan,
         request: SearchRequest,
     ) -> list[str]:
-        # GraphPort.query is generic Cypher; search-specific Cypher is
-        # intentionally left to a future adapter. Here we issue a basic
-        # full-text-style match as a placeholder.
         assert self._graph is not None
         rows = await self._graph.query(
             cypher="MATCH (m:Memory {tenant_id: $tid}) RETURN m.id AS id LIMIT $k",
@@ -240,25 +237,16 @@ def _extract_rrf_weights(
 
 def _build_items(
     fused: list[tuple[str, float]],
-    raw_results: list[list[str]],
-    coro_targets: list[IndexTarget],
     plan: QueryPlan,
 ) -> list[SearchResultItem]:
     """Construct :class:`SearchResultItem` objects from RRF-fused IDs."""
-    # Determine which target list to pull content from (prefer VECTOR then FULL_TEXT).
-    content_idx: int | None = None
-    for preferred in (IndexTarget.VECTOR, IndexTarget.FULL_TEXT, IndexTarget.GRAPH):
-        if preferred in coro_targets:
-            content_idx = coro_targets.index(preferred)
-            break
-
     items: list[SearchResultItem] = []
     for memory_id_str, score in fused:
         mid = MemoryId(memory_id_str)  # type: ignore[call-arg]
         items.append(
             SearchResultItem(
                 memory_id=mid,
-                content="",  # content hydration is done by a separate read-path
+                content="",
                 sector=MemorySector.SEMANTIC,
                 score=score,
                 pipeline_status=PipelineStatus.ENRICHED,

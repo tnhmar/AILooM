@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 from memory_layer.domain.exceptions import CapabilityNotAvailableError
 from memory_layer.domain.records import SearchMode, SearchRequest, Scope
@@ -81,11 +81,10 @@ def test_rrf_single_list_preserves_order() -> None:
     assert ids == ["a", "b", "c"]
 
 
-# 2. Two lists — item appearing in both ranks higher than one appearing in one
+# 2. Two lists — item appearing in both ranks higher
 def test_rrf_two_lists_merges_by_score() -> None:
     result = reciprocal_rank_fusion([["a", "b"], ["b", "c"]])
     id_map = {r[0]: r[1] for r in result}
-    # "b" appears in both lists so its combined score should be highest
     assert id_map["b"] > id_map["a"]
     assert id_map["b"] > id_map["c"]
 
