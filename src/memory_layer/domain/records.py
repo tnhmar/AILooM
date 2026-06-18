@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, List, Optional
 
 from memory_layer.domain.types import (
     AuditId,
@@ -254,7 +254,7 @@ class AuditEntry:
 
 
 # ---------------------------------------------------------------------------
-# MemoryTrace  (M1-T2)
+# MemoryTrace  (M1-T2) — write/audit provenance trace
 # ---------------------------------------------------------------------------
 
 
@@ -275,3 +275,33 @@ class MemoryTrace:
     recall_explanation: str | None = None
     query_plan: Any | None = None
     constructed_at: datetime = field(default_factory=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# TraceStep + RecallTrace  (M4-T4) — recall explanation trace
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class TraceStep:
+    """A single ranked record entry within a RecallTrace."""
+
+    memory_id: MemoryId
+    rank: int
+    score: float
+    signals: dict[str, Any] = field(default_factory=dict)
+    explanation: str = ""
+    record_available: bool = True
+
+
+@dataclass
+class RecallTrace:
+    """Recall explanation trace: captures query context and ranked TraceSteps."""
+
+    trace_id: TraceId
+    tenant_id: TenantId
+    query: str
+    mode: str
+    steps: List[TraceStep] = field(default_factory=list)
+    query_plan: Optional[Any] = None
+    created_at: datetime = field(default_factory=datetime.utcnow)

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 from memory_layer.domain.events import MemoryEvent
 from memory_layer.domain.policies import TenantPolicies
-from memory_layer.domain.records import AuditEntry, Fact, MemoryRecord, Scope
+from memory_layer.domain.records import AuditEntry, Fact, MemoryRecord, RecallTrace, Scope
 from memory_layer.domain.types import (
     EntityId,
     FactId,
@@ -17,6 +17,7 @@ from memory_layer.domain.types import (
     MemorySector,
     PipelineStatus,
     TenantId,
+    TraceId,
 )
 
 
@@ -250,3 +251,14 @@ class TenantPolicyRepositoryPort(Protocol):
     async def get(self, tenant_id: TenantId) -> TenantPolicies: ...
 
     async def save(self, tenant_id: TenantId, policies: TenantPolicies) -> None: ...
+
+
+@runtime_checkable
+class TraceRepositoryPort(Protocol):
+    """Persistent store for RecallTrace entities (recall explanation traces)."""
+
+    async def save(self, trace: RecallTrace) -> None: ...
+
+    async def get_by_trace_id(
+        self, trace_id: TraceId, tenant_id: TenantId
+    ) -> Optional[RecallTrace]: ...
