@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Coroutine
 from dataclasses import dataclass
+from typing import Any
 
 from memory_layer.domain.policies import ConsolidationTrigger
 from memory_layer.domain.types import TenantId
@@ -47,7 +49,7 @@ class LifecycleScheduler:
         self._decay_service = decay_service
         self._consolidation_service = consolidation_service
         self._policy_repo = policy_repo
-        self._tasks: dict[_TaskKey, asyncio.Task] = {}
+        self._tasks: dict[_TaskKey, asyncio.Task[None]] = {}
 
     async def start(
         self, tenant_id: TenantId, config: ScheduleConfig | None = None
@@ -137,19 +139,19 @@ class LifecycleScheduler:
         self,
         tenant_id: TenantId,
         job_type: str,
-        coro,
+        coro: Coroutine[Any, Any, None],
     ) -> None:
         """Create and register a task; cancel existing one if already running."""
         key: _TaskKey = (tenant_id, job_type)
         existing = self._tasks.get(key)
         if existing and not existing.done():
             existing.cancel()
-        task = asyncio.get_event_loop().create_task(coro)
+        task: asyncio.Task[None] = asyncio.get_event_loop().create_task(coro)
         self._tasks[key] = task
 
     async def _cancel_keys(self, keys: list[_TaskKey]) -> None:
         """Cancel and await all tasks identified by *keys*."""
-        tasks_to_cancel: list[asyncio.Task] = []
+        tasks_to_cancel: list[asyncio.Task[None]] = []
         for key in keys:
             task = self._tasks.pop(key, None)
             if task and not task.done():

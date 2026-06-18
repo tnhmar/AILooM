@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from memory_layer.domain.events import (
     MemoryArchivedEvent,
@@ -189,13 +190,14 @@ class DecayService:
         precedence over the global decay_after_days. Returns None if no
         threshold is configured.
         """
-        sector_key = (
+        sector_key: str = (
             record.sector.value if hasattr(record.sector, "value") else str(record.sector)
         )
-        if sector_key in policy.sector_decay_overrides:
-            return policy.sector_decay_overrides[sector_key]
-        if record.sector in policy.sector_decay_overrides:
-            return policy.sector_decay_overrides[record.sector]
+        override: Any = policy.sector_decay_overrides.get(sector_key)
+        if override is None:
+            override = policy.sector_decay_overrides.get(record.sector)
+        if override is not None:
+            return int(override)
         return policy.decay_after_days
 
 
