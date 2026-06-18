@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Optional
 
 from memory_layer.domain.events import (
     MemoryArchivedEvent,
@@ -22,7 +21,6 @@ from memory_layer.domain.types import (
     TenantId,
     new_audit_id,
 )
-from memory_layer.ports.inbound import DecayUseCase
 from memory_layer.ports.outbound import (
     AuditLogPort,
     MemoryRecordRepositoryPort,
@@ -191,7 +189,9 @@ class DecayService:
         precedence over the global decay_after_days. Returns None if no
         threshold is configured.
         """
-        sector_key = record.sector.value if hasattr(record.sector, "value") else str(record.sector)
+        sector_key = (
+            record.sector.value if hasattr(record.sector, "value") else str(record.sector)
+        )
         if sector_key in policy.sector_decay_overrides:
             return policy.sector_decay_overrides[sector_key]
         if record.sector in policy.sector_decay_overrides:

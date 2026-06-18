@@ -199,7 +199,11 @@ async def test_archived_records_deleted() -> None:
     old_archived = _record(state=LifecycleState.ARCHIVED, age_days=800)
     svc, record_repo, *_ = _make_service(
         archived_records=[old_archived],
-        policy=_policy(decay_after_days=None, archive_after_days=None, delete_after_days=730),
+        policy=_policy(
+            decay_after_days=None,
+            archive_after_days=None,
+            delete_after_days=730,
+        ),
     )
     await svc.execute(TENANT)
     record_repo.update_lifecycle.assert_awaited_once_with(
@@ -215,7 +219,11 @@ async def test_deleted_event_emitted() -> None:
     old_archived = _record(state=LifecycleState.ARCHIVED, age_days=800)
     svc, _, _, observer, _ = _make_service(
         archived_records=[old_archived],
-        policy=_policy(decay_after_days=None, archive_after_days=None, delete_after_days=730),
+        policy=_policy(
+            decay_after_days=None,
+            archive_after_days=None,
+            delete_after_days=730,
+        ),
     )
     await svc.execute(TENANT)
     observer.emit.assert_awaited_once()
@@ -239,7 +247,11 @@ async def test_none_delete_threshold_skips_step() -> None:
     archived = _record(state=LifecycleState.ARCHIVED, age_days=1000)
     svc, record_repo, *_ = _make_service(
         archived_records=[archived],
-        policy=_policy(decay_after_days=None, archive_after_days=None, delete_after_days=None),
+        policy=_policy(
+            decay_after_days=None,
+            archive_after_days=None,
+            delete_after_days=None,
+        ),
     )
     await svc.execute(TENANT)
     record_repo.update_lifecycle.assert_not_awaited()
@@ -257,8 +269,12 @@ async def test_process_limit_caps_transitions() -> None:
 
 @pytest.mark.asyncio
 async def test_sector_override_takes_precedence() -> None:
-    record_episodic = _record(state=LifecycleState.ACTIVE, age_days=50, sector=MemorySector.EPISODIC)
-    record_semantic = _record(state=LifecycleState.ACTIVE, age_days=50, sector=MemorySector.SEMANTIC)
+    record_episodic = _record(
+        state=LifecycleState.ACTIVE, age_days=50, sector=MemorySector.EPISODIC
+    )
+    record_semantic = _record(
+        state=LifecycleState.ACTIVE, age_days=50, sector=MemorySector.SEMANTIC
+    )
     pol = _policy(
         decay_after_days=90,
         sector_decay_overrides={MemorySector.EPISODIC.value: 30},
