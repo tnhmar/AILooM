@@ -43,9 +43,9 @@ def _req(
     return SearchRequest(
         tenant_id=TENANT,
         scope=_SCOPE,
-        query_text="test query",
+        query="test query",
         mode=mode,
-        top_k=top_k,
+        k=top_k,
         temporal_filter=temporal_filter,
     )
 
@@ -148,8 +148,8 @@ def test_explanation_non_empty(mode: SearchMode, graph_available: bool) -> None:
 # 12. temporal_filter from request is propagated to QueryPlan
 def test_temporal_filter_propagated() -> None:
     tf = TemporalFilter(
-        after=datetime(2025, 1, 1, tzinfo=UTC),
-        before=datetime(2026, 1, 1, tzinfo=UTC),
+        from_dt=datetime(2025, 1, 1, tzinfo=UTC),
+        until_dt=datetime(2026, 1, 1, tzinfo=UTC),
     )
     plan = _PLANNER.plan(
         _req(SearchMode.HYBRID_TEMPORAL, temporal_filter=tf),

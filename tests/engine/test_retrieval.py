@@ -31,9 +31,9 @@ def _req(mode: SearchMode, top_k: int = 5) -> SearchRequest:
     return SearchRequest(
         tenant_id=TENANT,
         scope=_SCOPE,
-        query_text="test query",
+        query="test query",
         mode=mode,
-        top_k=top_k,
+        k=top_k,
     )
 
 
@@ -161,7 +161,7 @@ async def test_graph_port_none_raises() -> None:
     plan = QueryPlan(
         mode=SearchMode.GRAPH,
         targets=[IndexTarget.GRAPH],
-        weights={"graph_weight": 1.0},
+        weights={"entity_weight": 1.0},
         final_k=5,
         k_per_index=20,
         explanation="graph test",
