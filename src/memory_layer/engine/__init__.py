@@ -1,1 +1,1 @@
-"""Memory engine: ingestion, extraction, contradiction resolution, planning, retrieval, recall."""
+"""Memory engine — use-case implementations."""
