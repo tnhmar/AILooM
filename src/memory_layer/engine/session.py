@@ -9,7 +9,6 @@ from memory_layer.domain.policies import ConsolidationTrigger
 from memory_layer.domain.records import Scope
 from memory_layer.domain.types import LifecycleState, SessionId, TenantId
 from memory_layer.engine.consolidation import ConsolidationService
-from memory_layer.ports.inbound import NotifySessionEndedUseCase
 from memory_layer.ports.outbound import (
     MemoryRecordRepositoryPort,
     ObserverPort,
@@ -48,7 +47,6 @@ class SessionEndHandler:
         session_id: SessionId,
         scope: Scope,
     ) -> None:
-        # Step 1: count ACTIVE records in this session scope.
         records = await self._record_repo.list_by_scope(
             scope=scope,
             lifecycle_states=[LifecycleState.ACTIVE],
@@ -56,7 +54,6 @@ class SessionEndHandler:
         )
         record_count = len(records)
 
-        # Step 2: emit SessionEndedEvent.
         await self._observer.emit(
             SessionEndedEvent(
                 tenant_id=tenant_id,
@@ -66,11 +63,9 @@ class SessionEndHandler:
             )
         )
 
-        # Step 3: load consolidation policy.
         tenant_policies = await self._policy_repo.get(tenant_id)
         policy = tenant_policies.consolidation
 
-        # Step 4: conditionally trigger consolidation.
         if policy.trigger == ConsolidationTrigger.SESSION_END and policy.enabled:
             log.debug(
                 "Session %s ended for tenant %s — triggering consolidation.",

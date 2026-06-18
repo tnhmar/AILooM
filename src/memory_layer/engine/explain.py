@@ -5,9 +5,8 @@ from __future__ import annotations
 import logging
 
 from memory_layer.domain.exceptions import MemoryNotFoundError
-from memory_layer.domain.records import RecallTrace, TraceStep
+from memory_layer.domain.records import RecallTrace
 from memory_layer.domain.types import TenantId, TraceId
-from memory_layer.ports.inbound import ExplainRecallUseCase
 from memory_layer.ports.outbound import (
     AuditLogPort,
     MemoryRecordRepositoryPort,

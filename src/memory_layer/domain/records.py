@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, List, Optional
+from typing import Any
 
 from memory_layer.domain.types import (
     AuditId,
@@ -302,6 +302,6 @@ class RecallTrace:
     tenant_id: TenantId
     query: str
     mode: str
-    steps: List[TraceStep] = field(default_factory=list)
-    query_plan: Optional[Any] = None
+    steps: list[TraceStep] = field(default_factory=list)
+    query_plan: Any | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)

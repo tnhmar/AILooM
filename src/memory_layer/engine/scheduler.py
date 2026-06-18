@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from memory_layer.domain.policies import ConsolidationTrigger
 from memory_layer.domain.types import TenantId
@@ -25,8 +24,7 @@ class ScheduleConfig:
     enabled: bool = True
 
 
-# Internal key type for the task registry.
-_TaskKey = tuple[TenantId, str]  # (tenant_id, "decay" | "consolidation")
+_TaskKey = tuple[TenantId, str]
 
 
 class LifecycleScheduler:
@@ -51,12 +49,8 @@ class LifecycleScheduler:
         self._policy_repo = policy_repo
         self._tasks: dict[_TaskKey, asyncio.Task] = {}
 
-    # ------------------------------------------------------------------
-    # Public interface
-    # ------------------------------------------------------------------
-
     async def start(
-        self, tenant_id: TenantId, config: Optional[ScheduleConfig] = None
+        self, tenant_id: TenantId, config: ScheduleConfig | None = None
     ) -> None:
         """Start decay (and optionally consolidation) loops for *tenant_id*."""
         cfg = config or ScheduleConfig()
@@ -64,14 +58,12 @@ class LifecycleScheduler:
             log.debug("Scheduler disabled for tenant %s — not starting.", tenant_id)
             return
 
-        # Always start the decay loop.
         self._ensure_task(
             tenant_id,
             "decay",
             self._decay_loop(tenant_id, cfg.decay_interval_seconds),
         )
 
-        # Start consolidation loop only when policy trigger is SCHEDULE.
         tenant_policies = await self._policy_repo.get(tenant_id)
         consolidation_policy = tenant_policies.consolidation
         if consolidation_policy.trigger == ConsolidationTrigger.SCHEDULE:
@@ -104,10 +96,6 @@ class LifecycleScheduler:
             k[0] == tenant_id and not t.done()
             for k, t in self._tasks.items()
         )
-
-    # ------------------------------------------------------------------
-    # Job loops
-    # ------------------------------------------------------------------
 
     async def _decay_loop(self, tenant_id: TenantId, interval: int) -> None:
         """Run decay sweep every *interval* seconds; survive individual failures."""
@@ -144,10 +132,6 @@ class LifecycleScheduler:
                     exc,
                     exc_info=True,
                 )
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
 
     def _ensure_task(
         self,

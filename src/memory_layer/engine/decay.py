@@ -17,7 +17,8 @@ from memory_layer.domain.types import (
     AuditOperation,
     AuditOutcome,
     LifecycleState,
-    MemorySector,
+    PrincipalId,
+    PrincipalType,
     TenantId,
     new_audit_id,
 )
@@ -31,7 +32,6 @@ from memory_layer.ports.outbound import (
 
 log = logging.getLogger(__name__)
 
-# Sentinel scope used when a record's scope is not relevant for system operations.
 _ACTOR = "decay-service"
 
 
@@ -68,10 +68,6 @@ class DecayService:
         self._policy_repo = policy_repo
         self._process_limit = process_limit
 
-    # ------------------------------------------------------------------
-    # Public interface
-    # ------------------------------------------------------------------
-
     async def execute(self, tenant_id: TenantId) -> int:
         """Run decay sweep for *tenant_id*; return number of records transitioned."""
         tenant_policies = await self._policy_repo.get(tenant_id)
@@ -83,10 +79,6 @@ class DecayService:
 
         total = 0
         now = datetime.now(tz=UTC)
-
-        # Build a minimal scope for list_by_scope (tenant-wide sweep).
-        from memory_layer.domain.records import Scope  # local to avoid circular
-        from memory_layer.domain.types import PrincipalId, PrincipalType
 
         sweep_scope = Scope(
             tenant_id=tenant_id,
@@ -149,10 +141,6 @@ class DecayService:
         )
         return total
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
     async def _transition(
         self,
         record: MemoryRecord,
@@ -196,25 +184,20 @@ class DecayService:
 
     def _effective_decay_days(
         self, record: MemoryRecord, policy: RetentionPolicy
-    ) -> Optional[int]:
+    ) -> int | None:
         """Return effective decay threshold in days for *record*.
 
         Sector override (keyed by MemorySector value or enum member) takes
-        precedence over the global decay_after_days.  Returns None if no
-        threshold is configured (caller should skip the record).
+        precedence over the global decay_after_days. Returns None if no
+        threshold is configured.
         """
         sector_key = record.sector.value if hasattr(record.sector, "value") else str(record.sector)
         if sector_key in policy.sector_decay_overrides:
             return policy.sector_decay_overrides[sector_key]
-        # Also check by enum member directly (dict may use MemorySector enum keys)
         if record.sector in policy.sector_decay_overrides:
             return policy.sector_decay_overrides[record.sector]
         return policy.decay_after_days
 
-
-# ---------------------------------------------------------------------------
-# Module-level helpers
-# ---------------------------------------------------------------------------
 
 _STATE_TO_AUDIT_OP: dict[LifecycleState, AuditOperation] = {
     LifecycleState.DECAYED: AuditOperation.DECAY,
@@ -252,7 +235,3 @@ def _ensure_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=UTC)
     return dt.astimezone(UTC)
-
-
-# Runtime structural check — ensures DecayService satisfies DecayUseCase protocol.
-assert isinstance(DecayService.__new__(DecayService), DecayUseCase) is False or True  # noqa: S101

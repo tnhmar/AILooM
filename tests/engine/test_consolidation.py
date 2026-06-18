@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -25,10 +25,6 @@ from memory_layer.domain.types import (
 )
 from memory_layer.engine.consolidation import ConsolidationService
 from memory_layer.ports.inbound import ConsolidateUseCase
-
-# ---------------------------------------------------------------------------
-# Shared helpers
-# ---------------------------------------------------------------------------
 
 TENANT = TenantId("tenant-consolidation")
 _SCOPE = Scope(
@@ -98,41 +94,37 @@ def _make_service(
     return svc, record_repo, audit_log, observer, policy_repo
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-# 1. ConsolidationService satisfies ConsolidateUseCase protocol
+# 1.
 def test_consolidation_service_satisfies_use_case() -> None:
     svc, *_ = _make_service()
     assert isinstance(svc, ConsolidateUseCase)
 
 
-# 2. ConsolidationJobStartedEvent emitted at the start
+# 2.
 @pytest.mark.asyncio
 async def test_job_started_event_emitted() -> None:
     svc, _, _, observer, _ = _make_service(records=[_record()])
     await svc.execute(TENANT)
-    emitted_types = [type(call.args[0]) for call in observer.emit.call_args_list]
+    emitted_types = [type(c.args[0]) for c in observer.emit.call_args_list]
     assert ConsolidationJobStartedEvent in emitted_types
 
 
-# 3. ConsolidationJobCompletedEvent emitted at end with correct records_processed
+# 3.
 @pytest.mark.asyncio
 async def test_job_completed_event_records_processed() -> None:
     records = [_record(payload=f"p{i}") for i in range(3)]
     svc, _, _, observer, _ = _make_service(records=records)
     count = await svc.execute(TENANT)
     completed_events = [
-        call.args[0]
-        for call in observer.emit.call_args_list
-        if isinstance(call.args[0], ConsolidationJobCompletedEvent)
+        c.args[0]
+        for c in observer.emit.call_args_list
+        if isinstance(c.args[0], ConsolidationJobCompletedEvent)
     ]
     assert len(completed_events) == 1
     assert completed_events[0].records_processed == count
 
 
-# 4. policy.enabled=False returns 0 and skips all processing
+# 4.
 @pytest.mark.asyncio
 async def test_disabled_policy_returns_zero() -> None:
     records = [_record() for _ in range(5)]
@@ -146,11 +138,10 @@ async def test_disabled_policy_returns_zero() -> None:
     audit_log.append.assert_not_awaited()
 
 
-# 5. Sector not in policy.sectors is skipped
+# 5.
 @pytest.mark.asyncio
 async def test_out_of_scope_sector_skipped() -> None:
     semantic_record = _record(sector=MemorySector.SEMANTIC)
-    # policy only covers EPISODIC
     svc, record_repo, *_ = _make_service(
         records=[semantic_record],
         policy=_policy(sectors=[MemorySector.EPISODIC]),
@@ -160,27 +151,24 @@ async def test_out_of_scope_sector_skipped() -> None:
     record_repo.update_lifecycle.assert_not_awaited()
 
 
-# 6. Count below threshold_record_count causes sector to be skipped
+# 6.
 @pytest.mark.asyncio
 async def test_below_threshold_sector_skipped() -> None:
     record = _record()
     svc, record_repo, *_ = _make_service(
         records=[record],
-        policy=_policy(threshold=5),  # need 5, only have 1
+        policy=_policy(threshold=5),
     )
     count = await svc.execute(TENANT)
     assert count == 0
     record_repo.update_lifecycle.assert_not_awaited()
 
 
-# 7. Source records are transitioned to CONSOLIDATED lifecycle state
+# 7.
 @pytest.mark.asyncio
 async def test_source_records_transitioned_to_consolidated() -> None:
     records = [_record(payload=f"payload-{i}") for i in range(2)]
-    svc, record_repo, *_ = _make_service(
-        records=records,
-        policy=_policy(threshold=1),
-    )
+    svc, record_repo, *_ = _make_service(records=records, policy=_policy(threshold=1))
     await svc.execute(TENANT)
     calls = record_repo.update_lifecycle.await_args_list
     transitioned_states = [c.kwargs["state"] for c in calls]
@@ -188,14 +176,11 @@ async def test_source_records_transitioned_to_consolidated() -> None:
     assert len(calls) == 2
 
 
-# 8. MemoryConsolidatedEvent emitted per source record
+# 8.
 @pytest.mark.asyncio
 async def test_consolidated_event_emitted_per_record() -> None:
     records = [_record(payload=f"p{i}") for i in range(3)]
-    svc, _, _, observer, _ = _make_service(
-        records=records,
-        policy=_policy(threshold=1),
-    )
+    svc, _, _, observer, _ = _make_service(records=records, policy=_policy(threshold=1))
     await svc.execute(TENANT)
     consolidated_events = [
         c.args[0]
@@ -205,68 +190,55 @@ async def test_consolidated_event_emitted_per_record() -> None:
     assert len(consolidated_events) == 3
 
 
-# 9. audit_log.append called per source record
+# 9.
 @pytest.mark.asyncio
 async def test_audit_log_called_per_source_record() -> None:
     records = [_record(payload=f"p{i}") for i in range(4)]
-    svc, _, audit_log, *_ = _make_service(
-        records=records,
-        policy=_policy(threshold=1),
-    )
+    svc, _, audit_log, *_ = _make_service(records=records, policy=_policy(threshold=1))
     await svc.execute(TENANT)
     assert audit_log.append.await_count == 4
 
 
-# 10. A new consolidated MemoryRecord is saved via record_repo.save
+# 10.
 @pytest.mark.asyncio
 async def test_consolidated_record_saved() -> None:
     records = [_record(payload=f"p{i}") for i in range(2)]
-    svc, record_repo, *_ = _make_service(
-        records=records,
-        policy=_policy(threshold=1),
-    )
+    svc, record_repo, *_ = _make_service(records=records, policy=_policy(threshold=1))
     await svc.execute(TENANT)
     record_repo.save.assert_awaited_once()
 
 
-# 11. New consolidated record has lifecycle_state=CONSOLIDATED and pipeline_status=ENRICHED
+# 11.
 @pytest.mark.asyncio
 async def test_new_consolidated_record_fields() -> None:
     records = [_record(payload=f"p{i}") for i in range(2)]
-    svc, record_repo, *_ = _make_service(
-        records=records,
-        policy=_policy(threshold=1),
-    )
+    svc, record_repo, *_ = _make_service(records=records, policy=_policy(threshold=1))
     await svc.execute(TENANT)
     saved_record: MemoryRecord = record_repo.save.call_args[0][0]
     assert saved_record.lifecycle_state == LifecycleState.CONSOLIDATED
     assert saved_record.pipeline_status == PipelineStatus.ENRICHED
 
 
-# 12. Without llm_client, fallback is newline-joined payloads
+# 12.
 @pytest.mark.asyncio
 async def test_no_llm_fallback_is_newline_join() -> None:
     records = [_record(payload="alpha"), _record(payload="beta")]
     svc, record_repo, *_ = _make_service(
-        records=records,
-        policy=_policy(threshold=1),
-        llm_client=None,
+        records=records, policy=_policy(threshold=1), llm_client=None
     )
     await svc.execute(TENANT)
     saved_record: MemoryRecord = record_repo.save.call_args[0][0]
     assert saved_record.raw_payload == "alpha\nbeta"
 
 
-# 13. With llm_client, _summarise calls llm_client.complete
+# 13.
 @pytest.mark.asyncio
 async def test_llm_client_called_for_summarise() -> None:
     llm_client = AsyncMock()
     llm_client.complete.return_value = "LLM summary"
     records = [_record(payload="alpha"), _record(payload="beta")]
     svc, record_repo, *_ = _make_service(
-        records=records,
-        policy=_policy(threshold=1),
-        llm_client=llm_client,
+        records=records, policy=_policy(threshold=1), llm_client=llm_client
     )
     await svc.execute(TENANT)
     llm_client.complete.assert_awaited_once()
@@ -274,30 +246,24 @@ async def test_llm_client_called_for_summarise() -> None:
     assert saved_record.raw_payload == "LLM summary"
 
 
-# 14. _summarise LLM exception falls back gracefully (no raise)
+# 14.
 @pytest.mark.asyncio
 async def test_llm_exception_falls_back_gracefully() -> None:
     llm_client = AsyncMock()
     llm_client.complete.side_effect = RuntimeError("LLM timeout")
     records = [_record(payload="x"), _record(payload="y")]
     svc, record_repo, *_ = _make_service(
-        records=records,
-        policy=_policy(threshold=1),
-        llm_client=llm_client,
+        records=records, policy=_policy(threshold=1), llm_client=llm_client
     )
-    # Should not raise; should fall back to newline-joined payloads.
     await svc.execute(TENANT)
     saved_record: MemoryRecord = record_repo.save.call_args[0][0]
     assert saved_record.raw_payload == "x\ny"
 
 
-# 15. Return value equals number of source records consolidated
+# 15.
 @pytest.mark.asyncio
 async def test_return_value_equals_source_records() -> None:
     records = [_record(payload=f"p{i}") for i in range(7)]
-    svc, *_ = _make_service(
-        records=records,
-        policy=_policy(threshold=1),
-    )
+    svc, *_ = _make_service(records=records, policy=_policy(threshold=1))
     count = await svc.execute(TENANT)
     assert count == 7

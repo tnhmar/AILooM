@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import List, Optional
 
 from memory_layer.domain.events import (
     ConsolidationJobCompletedEvent,
@@ -20,6 +19,8 @@ from memory_layer.domain.types import (
     MemorySector,
     PayloadType,
     PipelineStatus,
+    PrincipalId,
+    PrincipalType,
     TenantId,
     new_audit_id,
     new_job_id,
@@ -27,7 +28,6 @@ from memory_layer.domain.types import (
     new_schedule_id,
 )
 from memory_layer.engine.extraction import LLMClientPort
-from memory_layer.ports.inbound import ConsolidateUseCase
 from memory_layer.ports.outbound import (
     AuditLogPort,
     MemoryRecordRepositoryPort,
@@ -52,7 +52,7 @@ class ConsolidationService:
 
     Consolidation flow:
     1. Emit ConsolidationJobStartedEvent.
-    2. Load ConsolidationPolicy.  If disabled, emit Completed(0) and return 0.
+    2. Load ConsolidationPolicy. If disabled, emit Completed(0) and return 0.
     3. For each target sector in policy.sectors:
        a. Fetch ACTIVE records up to policy.max_items_per_run.
        b. Skip if count < policy.threshold_record_count.
@@ -69,7 +69,7 @@ class ConsolidationService:
         audit_log: AuditLogPort,
         observer: ObserverPort,
         policy_repo: TenantPolicyRepositoryPort,
-        llm_client: Optional[LLMClientPort] = None,
+        llm_client: LLMClientPort | None = None,
     ) -> None:
         self._record_repo = record_repo
         self._audit_log = audit_log
@@ -77,12 +77,8 @@ class ConsolidationService:
         self._policy_repo = policy_repo
         self._llm_client = llm_client
 
-    # ------------------------------------------------------------------
-    # Public interface
-    # ------------------------------------------------------------------
-
     async def execute(
-        self, tenant_id: TenantId, scope: Optional[Scope] = None
+        self, tenant_id: TenantId, scope: Scope | None = None
     ) -> int:
         """Run consolidation sweep for *tenant_id*; return source records processed."""
         started_at = datetime.now(tz=UTC)
@@ -113,14 +109,11 @@ class ConsolidationService:
             )
             return 0
 
-        # Resolve target sectors.
         target_sectors: list[MemorySector] = (
             list(policy.sectors) if policy.sectors else list(MemorySector)
         )
 
-        # Build a sweep scope if caller did not provide one.
         if scope is None:
-            from memory_layer.domain.types import PrincipalId, PrincipalType
             scope = Scope(
                 tenant_id=tenant_id,
                 principal_id=PrincipalId("system"),
@@ -156,10 +149,6 @@ class ConsolidationService:
         )
         return total_processed
 
-    # ------------------------------------------------------------------
-    # Per-sector logic
-    # ------------------------------------------------------------------
-
     async def _process_sector(
         self,
         tenant_id: TenantId,
@@ -172,7 +161,6 @@ class ConsolidationService:
             lifecycle_states=[LifecycleState.ACTIVE],
             limit=policy.max_items_per_run,
         )
-        # Filter to this sector.
         records = [r for r in records if r.sector == sector]
 
         if len(records) < policy.threshold_record_count:
@@ -184,7 +172,6 @@ class ConsolidationService:
             )
             return 0
 
-        # Group by (principal_id, workspace_id).
         groups: dict[tuple[str, str | None], list[MemoryRecord]] = {}
         for record in records:
             key = (record.scope.principal_id, record.scope.workspace_id)
@@ -212,7 +199,6 @@ class ConsolidationService:
         summary = await self._summarise(records)
         group_scope = records[0].scope
 
-        # Save consolidated record.
         consolidated = MemoryRecord(
             id=new_memory_id(),
             tenant_id=tenant_id,
@@ -225,7 +211,6 @@ class ConsolidationService:
         )
         await self._record_repo.save(consolidated)
 
-        # Transition each source record and emit audit + event.
         for record in records:
             await self._record_repo.update_lifecycle(
                 memory_id=record.id,
@@ -255,11 +240,7 @@ class ConsolidationService:
 
         return len(records)
 
-    # ------------------------------------------------------------------
-    # LLM summarisation
-    # ------------------------------------------------------------------
-
-    async def _summarise(self, records: List[MemoryRecord]) -> str:
+    async def _summarise(self, records: list[MemoryRecord]) -> str:
         """Produce a consolidated summary string from *records*.
 
         Uses LLM when available; falls back to newline-joined payloads on any

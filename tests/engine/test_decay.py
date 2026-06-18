@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -25,10 +25,6 @@ from memory_layer.domain.types import (
 )
 from memory_layer.engine.decay import DecayService
 from memory_layer.ports.inbound import DecayUseCase
-
-# ---------------------------------------------------------------------------
-# Shared helpers
-# ---------------------------------------------------------------------------
 
 TENANT = TenantId("tenant-decay")
 _SCOPE = Scope(
@@ -115,23 +111,16 @@ def _make_service(
     return svc, record_repo, audit_log, observer, policy_repo
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-# 1. DecayService satisfies DecayUseCase protocol
 def test_decay_service_satisfies_use_case() -> None:
     svc, *_ = _make_service()
     assert isinstance(svc, DecayUseCase)
 
 
-# 2. Records older than decay_after_days are transitioned to DECAYED
 @pytest.mark.asyncio
 async def test_old_records_transitioned_to_decayed() -> None:
     old_record = _record(state=LifecycleState.ACTIVE, age_days=100)
     svc, record_repo, *_ = _make_service(
-        active_records=[old_record],
-        policy=_policy(decay_after_days=90),
+        active_records=[old_record], policy=_policy(decay_after_days=90)
     )
     await svc.execute(TENANT)
     record_repo.update_lifecycle.assert_awaited_once_with(
@@ -142,13 +131,11 @@ async def test_old_records_transitioned_to_decayed() -> None:
     )
 
 
-# 3. MemoryDecayedEvent is emitted for each decayed record
 @pytest.mark.asyncio
 async def test_decayed_event_emitted() -> None:
     old_record = _record(state=LifecycleState.ACTIVE, age_days=100)
     svc, _, _, observer, _ = _make_service(
-        active_records=[old_record],
-        policy=_policy(decay_after_days=90),
+        active_records=[old_record], policy=_policy(decay_after_days=90)
     )
     await svc.execute(TENANT)
     observer.emit.assert_awaited_once()
@@ -157,32 +144,27 @@ async def test_decayed_event_emitted() -> None:
     assert event.memory_id == old_record.id
 
 
-# 4. audit_log.append is called for each DECAYED transition
 @pytest.mark.asyncio
 async def test_audit_log_called_for_decay() -> None:
     records = [_record(age_days=100) for _ in range(3)]
     svc, _, audit_log, *_ = _make_service(
-        active_records=records,
-        policy=_policy(decay_after_days=90),
+        active_records=records, policy=_policy(decay_after_days=90)
     )
     await svc.execute(TENANT)
     assert audit_log.append.await_count == 3
 
 
-# 5. Records NOT yet old enough are NOT transitioned
 @pytest.mark.asyncio
 async def test_young_records_not_transitioned() -> None:
     young = _record(state=LifecycleState.ACTIVE, age_days=10)
     svc, record_repo, *_ = _make_service(
-        active_records=[young],
-        policy=_policy(decay_after_days=90),
+        active_records=[young], policy=_policy(decay_after_days=90)
     )
     count = await svc.execute(TENANT)
     record_repo.update_lifecycle.assert_not_awaited()
     assert count == 0
 
 
-# 6. DECAYED records older than archive_after_days → ARCHIVED
 @pytest.mark.asyncio
 async def test_decayed_records_archived() -> None:
     old_decayed = _record(state=LifecycleState.DECAYED, age_days=400)
@@ -199,7 +181,6 @@ async def test_decayed_records_archived() -> None:
     )
 
 
-# 7. MemoryArchivedEvent is emitted for each archived record
 @pytest.mark.asyncio
 async def test_archived_event_emitted() -> None:
     old_decayed = _record(state=LifecycleState.DECAYED, age_days=400)
@@ -213,7 +194,6 @@ async def test_archived_event_emitted() -> None:
     assert isinstance(event, MemoryArchivedEvent)
 
 
-# 8. ARCHIVED records older than delete_after_days → DELETED
 @pytest.mark.asyncio
 async def test_archived_records_deleted() -> None:
     old_archived = _record(state=LifecycleState.ARCHIVED, age_days=800)
@@ -230,7 +210,6 @@ async def test_archived_records_deleted() -> None:
     )
 
 
-# 9. MemoryDeletedEvent is emitted for each deleted record
 @pytest.mark.asyncio
 async def test_deleted_event_emitted() -> None:
     old_archived = _record(state=LifecycleState.ARCHIVED, age_days=800)
@@ -244,7 +223,6 @@ async def test_deleted_event_emitted() -> None:
     assert isinstance(event, MemoryDeletedEvent)
 
 
-# 10. archive_after_days=None skips the archive step
 @pytest.mark.asyncio
 async def test_none_archive_threshold_skips_step() -> None:
     decayed = _record(state=LifecycleState.DECAYED, age_days=500)
@@ -256,7 +234,6 @@ async def test_none_archive_threshold_skips_step() -> None:
     record_repo.update_lifecycle.assert_not_awaited()
 
 
-# 11. delete_after_days=None skips the delete step
 @pytest.mark.asyncio
 async def test_none_delete_threshold_skips_step() -> None:
     archived = _record(state=LifecycleState.ARCHIVED, age_days=1000)
@@ -268,41 +245,26 @@ async def test_none_delete_threshold_skips_step() -> None:
     record_repo.update_lifecycle.assert_not_awaited()
 
 
-# 12. process_limit=2 caps total transitions
 @pytest.mark.asyncio
 async def test_process_limit_caps_transitions() -> None:
     records = [_record(age_days=100) for _ in range(5)]
     svc, *_ = _make_service(
-        active_records=records,
-        policy=_policy(decay_after_days=90),
-        process_limit=2,
+        active_records=records, policy=_policy(decay_after_days=90), process_limit=2
     )
     count = await svc.execute(TENANT)
     assert count == 2
 
 
-# 13. Sector override takes precedence over global decay_after_days
 @pytest.mark.asyncio
 async def test_sector_override_takes_precedence() -> None:
-    # EPISODIC override = 30 days; global = 90 days.
-    # Record is 50 days old — would NOT decay under global, but SHOULD under override.
-    record_episodic = _record(
-        state=LifecycleState.ACTIVE,
-        age_days=50,
-        sector=MemorySector.EPISODIC,
-    )
-    record_semantic = _record(
-        state=LifecycleState.ACTIVE,
-        age_days=50,
-        sector=MemorySector.SEMANTIC,
-    )
+    record_episodic = _record(state=LifecycleState.ACTIVE, age_days=50, sector=MemorySector.EPISODIC)
+    record_semantic = _record(state=LifecycleState.ACTIVE, age_days=50, sector=MemorySector.SEMANTIC)
     pol = _policy(
         decay_after_days=90,
         sector_decay_overrides={MemorySector.EPISODIC.value: 30},
     )
     svc, record_repo, *_ = _make_service(
-        active_records=[record_episodic, record_semantic],
-        policy=pol,
+        active_records=[record_episodic, record_semantic], policy=pol
     )
     count = await svc.execute(TENANT)
     assert count == 1
@@ -314,13 +276,11 @@ async def test_sector_override_takes_precedence() -> None:
     )
 
 
-# 14. Record already in target state is silently skipped
 @pytest.mark.asyncio
 async def test_already_decayed_record_skipped() -> None:
     already_decayed = _record(state=LifecycleState.DECAYED, age_days=100)
     svc, record_repo, audit_log, observer, _ = _make_service(
-        active_records=[already_decayed],
-        policy=_policy(decay_after_days=90),
+        active_records=[already_decayed], policy=_policy(decay_after_days=90)
     )
     await svc._transition(already_decayed, LifecycleState.DECAYED, TENANT)
     record_repo.update_lifecycle.assert_not_awaited()
@@ -328,13 +288,9 @@ async def test_already_decayed_record_skipped() -> None:
     observer.emit.assert_not_awaited()
 
 
-# 15. Return value equals number of actual transitions
 @pytest.mark.asyncio
 async def test_return_value_equals_transitions() -> None:
     records = [_record(age_days=100) for _ in range(4)]
-    svc, *_ = _make_service(
-        active_records=records,
-        policy=_policy(decay_after_days=90),
-    )
+    svc, *_ = _make_service(active_records=records, policy=_policy(decay_after_days=90))
     count = await svc.execute(TENANT)
     assert count == 4

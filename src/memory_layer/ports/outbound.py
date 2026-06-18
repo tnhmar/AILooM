@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from memory_layer.domain.events import MemoryEvent
 from memory_layer.domain.policies import TenantPolicies
@@ -261,4 +261,4 @@ class TraceRepositoryPort(Protocol):
 
     async def get_by_trace_id(
         self, trace_id: TraceId, tenant_id: TenantId
-    ) -> Optional[RecallTrace]: ...
+    ) -> RecallTrace | None: ...
