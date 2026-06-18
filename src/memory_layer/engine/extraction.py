@@ -18,11 +18,12 @@ from memory_layer.domain.events import (
     FactsExtractedEvent,
 )
 from memory_layer.domain.policies import ConflictResolutionPolicy
-from memory_layer.domain.records import Fact, MemoryRecord, MemorySector
+from memory_layer.domain.records import Fact, MemoryRecord
 from memory_layer.domain.types import (
     EntityId,
     FactId,
     LifecycleState,
+    MemorySector,
     new_fact_id,
 )
 from memory_layer.ports.outbound import (
