@@ -1,0 +1,28 @@
+# pip-audit suppression registry
+# Each entry MUST include:
+#   - cve: the CVE identifier
+#   - reason: why it is suppressed instead of upgraded
+#   - expires: ISO date after which this suppression must be re-evaluated
+#   - owner: person/team accountable for re-evaluation
+#
+# To re-evaluate: check https://pypi.org/project/chromadb/ for a patched
+# release and remove this entry once chromadb >= <fixed_version> is pinned.
+
+[[ignore]]
+cve = "CVE-2026-45829"
+reason = """
+  ChromaToast: pre-auth RCE in chromadb >= 1.0.0 Python/FastAPI server.
+  No upstream patch available as of 2026-06-19 (CVSS 9.8).
+  chromadb has been demoted from core dependencies to the optional `chroma`
+  extra (pyproject.toml).  It is NOT installed in production images or in
+  the default `uv sync` environment.  This suppression covers the `chroma`
+  extra path only, which is restricted to local/dev use.
+  Mitigations applied:
+    - chromadb not installed in Docker runtime image (no --extra chroma).
+    - network access to any chromadb port blocked at infra level.
+    - trust_remote_code disabled in all adapter configs.
+  Re-evaluate when an upstream patch is confirmed:
+    https://www.cve.org/CVERecord?id=CVE-2026-45829
+"""
+expires = "2026-09-19"
+owner = "platform-security"

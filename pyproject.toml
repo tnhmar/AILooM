@@ -14,7 +14,13 @@ dependencies = [
     "pydantic>=2",
     "sqlalchemy>=2",
     "aiosqlite>=0.20",
-    "chromadb>=0.5",
+    # chromadb removed from core dependencies.
+    # CVE-2026-45829 (ChromaToast, CVSS 9.8): pre-auth RCE in all chromadb
+    # >= 1.0.0 via the Python/FastAPI server. No upstream patch available as
+    # of 2026-06-19.  Moved to optional extra `chroma` so production
+    # deployments that use pgvector or Qdrant are not exposed.  Re-evaluate
+    # when an upstream patch is confirmed; see:
+    # https://www.cve.org/CVERecord?id=CVE-2026-45829
     "opentelemetry-api>=1.20",
     "opentelemetry-sdk>=1.20",
     "fastapi>=0.110",
@@ -27,6 +33,16 @@ dependencies = [
 postgres = [
     "asyncpg>=0.29",
     "psycopg[binary]>=3",
+]
+qdrant = [
+    "qdrant-client>=1.9",
+]
+# CVE-2026-45829: chromadb extra is provided for local/dev use only.
+# Do NOT install this extra on internet-exposed servers until a patched
+# version is confirmed.  Use pgvector (`postgres` extra) or Qdrant
+# (`qdrant` extra) for production vector storage instead.
+chroma = [
+    "chromadb>=0.5",
 ]
 langgraph = [
     "langgraph>=0.2",
@@ -67,9 +83,6 @@ line-length = 100
 src = ["src"]
 
 [tool.ruff.lint]
-# I (isort) excluded: import ordering is style-only, enforced locally via
-# `ruff check --fix` or pre-commit hook, not in CI where editable installs
-# cause first-party classification ambiguity.
 select = ["E", "F", "UP"]
 
 [tool.ruff.lint.isort]

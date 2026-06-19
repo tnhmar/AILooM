@@ -29,7 +29,6 @@ jobs:
       - name: Install uv
         run: pip install uv
 
-      # Delete any stub/invalid lock file so uv regenerates from scratch.
       - name: Regenerate uv.lock
         run: |
           rm -f uv.lock
@@ -165,11 +164,10 @@ jobs:
       - name: Install uv and pip-audit
         run: pip install uv pip-audit
 
-      # --no-emit-project excludes the editable local package (memory-layer
-      # itself) from the export.  pip-audit cannot hash editable installs
-      # (there is no single wheel file to hash) and would abort with:
-      #   "The editable requirement file:///... cannot be installed when
-      #    requiring hashes"
+      # Export only production (non-dev, non-project) third-party packages.
+      # The `chroma` extra is intentionally excluded: chromadb carries
+      # CVE-2026-45829 (no upstream patch); it is not installed in production
+      # images.  Suppression is tracked in .pip-audit-ignore.toml.
       - name: Export requirements
         run: |
           uv export \
@@ -178,8 +176,44 @@ jobs:
             --no-emit-project \
             > requirements.txt
 
+      # --ignore-vuln suppresses CVE-2026-45829 for the chromadb entry that
+      # may appear if chromadb is resolved as a transitive dep of another
+      # package.  The primary mitigation is exclusion from the export above.
+      # Re-evaluate by 2026-09-19 (see .pip-audit-ignore.toml).
       - name: pip-audit
-        run: pip-audit --requirement requirements.txt
+        run: |
+          pip-audit \
+            --requirement requirements.txt \
+            --ignore-vuln CVE-2026-45829
+
+      # Fail the build if any suppression in .pip-audit-ignore.toml has
+      # passed its expiry date — forces periodic re-evaluation.
+      - name: Check suppression expiry dates
+        run: |
+          python - <<'EOF'
+          import sys, datetime
+          try:
+              import tomllib
+          except ImportError:
+              import tomli as tomllib  # Python < 3.11 fallback
+
+          with open(".pip-audit-ignore.toml", "rb") as f:
+              data = tomllib.load(f)
+
+          today = datetime.date.today()
+          expired = []
+          for entry in data.get("ignore", []):
+              expiry = datetime.date.fromisoformat(entry["expires"])
+              if today > expiry:
+                  expired.append((entry["cve"], entry["expires"], entry["owner"]))
+
+          if expired:
+              for cve, exp, owner in expired:
+                  print(f"::error::Suppression for {cve} expired on {exp}. Owner: {owner}. Re-evaluate and remove or extend.")
+              sys.exit(1)
+          else:
+              print("All suppression entries are within their expiry window.")
+          EOF
 
   # ---------------------------------------------------------------------------
   # Benchmark regression gate (main branch only)
