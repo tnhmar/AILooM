@@ -19,11 +19,11 @@ from memory_layer.config.settings import ObservabilitySettings
 # ---------------------------------------------------------------------------
 
 try:
-    from opentelemetry import trace as _otel_trace  # type: ignore[import-untyped]
-    from opentelemetry.sdk.resources import Resource  # type: ignore[import-untyped]
-    from opentelemetry.sdk.trace import TracerProvider  # type: ignore[import-untyped]
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor  # type: ignore[import-untyped]
-    from opentelemetry.trace import NonRecordingSpan, StatusCode  # type: ignore[import-untyped]
+    from opentelemetry import trace as _otel_trace
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    from opentelemetry.trace import NonRecordingSpan, StatusCode
 
     _OTEL_AVAILABLE = True
 except ImportError:
@@ -61,7 +61,7 @@ def configure_tracing(settings: ObservabilitySettings) -> None:
         return
 
     if not settings.tracing_enabled:
-        from opentelemetry.trace import NoOpTracerProvider  # type: ignore[import-untyped]
+        from opentelemetry.trace import NoOpTracerProvider
 
         _provider = NoOpTracerProvider()
         _otel_trace.set_tracer_provider(_provider)
@@ -74,7 +74,7 @@ def configure_tracing(settings: ObservabilitySettings) -> None:
     if settings.otlp_endpoint:
         try:
             from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
-                OTLPSpanExporter,  # type: ignore[import-untyped]
+                OTLPSpanExporter,
             )
 
             exporter = OTLPSpanExporter(endpoint=settings.otlp_endpoint)

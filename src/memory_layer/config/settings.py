@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Literal, Optional
 
 from pydantic import BaseModel
-from pydantic_settings import BaseSettings, SettingsConfigDict  # type: ignore[import-untyped]
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ServerSettings(BaseModel):

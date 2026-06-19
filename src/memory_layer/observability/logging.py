@@ -53,7 +53,7 @@ def configure_logging(settings: ObservabilitySettings, log_level: str = "INFO") 
 
     if settings.log_json:
         try:
-            from pythonjsonlogger.json import JsonFormatter  # type: ignore[import-untyped]
+            from pythonjsonlogger.json import JsonFormatter
         except ImportError:
             from pythonjsonlogger import jsonlogger  # type: ignore[import-untyped]
             JsonFormatter = jsonlogger.JsonFormatter  # type: ignore[assignment]

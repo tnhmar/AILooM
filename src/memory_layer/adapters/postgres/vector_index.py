@@ -11,7 +11,7 @@ import json
 from typing import Any
 
 import asyncpg
-import pgvector.asyncpg  # type: ignore[import-untyped]
+import pgvector.asyncpg
 
 from memory_layer.domain.types import (
     LifecycleState,

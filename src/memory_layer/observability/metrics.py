@@ -17,7 +17,7 @@ from memory_layer.config.settings import ObservabilitySettings
 # ---------------------------------------------------------------------------
 
 try:
-    from prometheus_client import (  # type: ignore[import-untyped]
+    from prometheus_client import (
         CONTENT_TYPE_LATEST,
         Counter,
         Gauge,
