@@ -165,8 +165,18 @@ jobs:
       - name: Install uv and pip-audit
         run: pip install uv pip-audit
 
+      # --no-emit-project excludes the editable local package (memory-layer
+      # itself) from the export.  pip-audit cannot hash editable installs
+      # (there is no single wheel file to hash) and would abort with:
+      #   "The editable requirement file:///... cannot be installed when
+      #    requiring hashes"
       - name: Export requirements
-        run: uv export --format requirements-txt --no-dev > requirements.txt
+        run: |
+          uv export \
+            --format requirements-txt \
+            --no-dev \
+            --no-emit-project \
+            > requirements.txt
 
       - name: pip-audit
         run: pip-audit --requirement requirements.txt
