@@ -1,9 +1,4 @@
-"""Prometheus metrics registry for memory-layer.
-
-All metrics are module-level singletons. Call :func:`configure_metrics` once
-at startup. When ``prometheus_client`` is not installed, every helper is a
-transparent no-op — no ``ImportError`` is ever raised at use-sites.
-"""
+"""Prometheus metrics registry for memory-layer."""
 
 from __future__ import annotations
 
@@ -11,10 +6,6 @@ from contextlib import contextmanager
 from typing import Any, Generator
 
 from memory_layer.config.settings import ObservabilitySettings
-
-# ---------------------------------------------------------------------------
-# Optional prometheus_client import
-# ---------------------------------------------------------------------------
 
 try:
     from prometheus_client import (
@@ -29,11 +20,11 @@ try:
     _PROM_AVAILABLE = True
 except ImportError:
     _PROM_AVAILABLE = False
-    Counter = None  # type: ignore[assignment]
-    Gauge = None  # type: ignore[assignment]
-    Histogram = None  # type: ignore[assignment]
+    Counter = None
+    Gauge = None
+    Histogram = None
     CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
-    generate_latest = None  # type: ignore[assignment]
+    generate_latest = None
 
     class Response:  # type: ignore[no-redef]
         def __init__(self, content: bytes, media_type: str) -> None:
@@ -41,20 +32,10 @@ except ImportError:
             self.media_type = media_type
 
 
-# ---------------------------------------------------------------------------
-# Metrics-enabled flag (set by configure_metrics)
-# ---------------------------------------------------------------------------
-
 _metrics_enabled: bool = False
-
-# ---------------------------------------------------------------------------
-# No-op stubs used when prometheus_client is absent or metrics disabled
-# ---------------------------------------------------------------------------
 
 
 class _NoOpMetric:
-    """Silent stand-in for any Prometheus metric."""
-
     def labels(self, **_: Any) -> "_NoOpMetric":
         return self
 
@@ -89,10 +70,6 @@ def _make_gauge(name: str, doc: str, labels: list[str]) -> Any:
     return _NOOP
 
 
-# ---------------------------------------------------------------------------
-# Module-level metric singletons
-# ---------------------------------------------------------------------------
-
 memory_writes_total: Any = _NOOP
 memory_searches_total: Any = _NOOP
 memory_recalls_total: Any = _NOOP
@@ -110,11 +87,6 @@ memory_active_records: Any = _NOOP
 
 
 def configure_metrics(settings: ObservabilitySettings) -> None:
-    """Initialise Prometheus metrics; no-op if ``metrics_enabled=False``.
-
-    Must be called once at application startup before any metric is incremented.
-    Safe to call multiple times (subsequent calls are no-ops).
-    """
     global _metrics_enabled
     global memory_writes_total, memory_searches_total, memory_recalls_total
     global memory_decays_total, memory_consolidations_total
@@ -168,15 +140,6 @@ def configure_metrics(settings: ObservabilitySettings) -> None:
 
 @contextmanager
 def track_latency(histogram: Any, labels: dict[str, str]) -> Generator[None, None, None]:
-    """Context manager that observes *histogram* with wall-clock duration on exit.
-
-    Parameters
-    ----------
-    histogram:
-        A Prometheus ``Histogram`` (or no-op stand-in).
-    labels:
-        Label key-value pairs forwarded to ``histogram.labels()``.
-    """
     import time
 
     start = time.perf_counter()
@@ -192,7 +155,6 @@ def track_latency(histogram: Any, labels: dict[str, str]) -> Generator[None, Non
 
 
 def metrics_response() -> Any:
-    """Return a Prometheus text-format HTTP response for the ``/metrics`` endpoint."""
     if not _PROM_AVAILABLE or not _metrics_enabled:
         return Response(content=b"", media_type="text/plain")
     return Response(

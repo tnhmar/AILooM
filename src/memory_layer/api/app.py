@@ -1,9 +1,4 @@
-"""memory-layer FastAPI application.
-
-This module is intentionally thin: request validation, tenant resolution,
-use-case dispatch, response mapping, and error translation only.
-No business logic lives here.
-"""
+"""memory-layer FastAPI application."""
 
 from __future__ import annotations
 
@@ -59,35 +54,20 @@ from memory_layer.ports.inbound import (
     WriteMemoryUseCase,
 )
 
-# ---------------------------------------------------------------------------
-# App
-# ---------------------------------------------------------------------------
-
 app = FastAPI(title="memory-layer", version="0.1.0")
 app.add_middleware(TenantMiddleware)
 register_exception_handlers(app)
 
-# Module-level HealthChecker singleton — callers may register probes at boot.
 _health_checker = HealthChecker(version="0.1.0")
 
 
 def get_health_checker() -> HealthChecker:
-    """Return the application-level HealthChecker."""
     return _health_checker
 
 
 def create_app() -> FastAPI:
-    """Application factory for ``uvicorn --factory`` and test bootstrapping.
-
-    Returns the singleton :data:`app` instance.  Uvicorn calls this when
-    invoked as ``uvicorn memory_layer.api.app:create_app --factory``.
-    """
     return app
 
-
-# ---------------------------------------------------------------------------
-# /metrics endpoint (registered only when metrics_enabled)
-# ---------------------------------------------------------------------------
 
 try:
     from memory_layer.config.loader import get_settings
@@ -102,18 +82,12 @@ except Exception:
     pass
 
 
-# ---------------------------------------------------------------------------
-# Health / readiness
-# ---------------------------------------------------------------------------
-
-
 @app.get("/healthz", tags=["ops"])
 async def healthz(
     checker: HealthChecker = Depends(get_health_checker),
 ) -> dict[str, Any]:
-    """Deep liveness probe — always returns 200 with a HealthReport JSON body."""
     report: HealthReport = await checker.check()
-    return asdict(report)  # type: ignore[return-value]
+    return asdict(report)
 
 
 @app.get("/readyz", tags=["ops"])
@@ -121,16 +95,10 @@ async def readyz(
     response: Response,
     checker: HealthChecker = Depends(get_health_checker),
 ) -> dict[str, Any]:
-    """Readiness probe — 200 when all components ok, 503 otherwise."""
     report: HealthReport = await checker.check()
     if report.status != "ok":
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    return asdict(report)  # type: ignore[return-value]
-
-
-# ---------------------------------------------------------------------------
-# Dependency stubs
-# ---------------------------------------------------------------------------
+    return asdict(report)
 
 
 def get_write_use_case() -> WriteMemoryUseCase:
@@ -170,13 +138,7 @@ def get_consolidate_use_case() -> ConsolidateUseCase:
 
 
 def get_schema_migrator() -> Any:
-    """Return the configured SchemaMigrator; override at startup."""
     raise NotImplementedError("SchemaMigrator provider not configured.")
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _scope_from_model(tenant_id: TenantId, m: object) -> Scope:
@@ -193,28 +155,17 @@ def _scope_from_model(tenant_id: TenantId, m: object) -> Scope:
     )
 
 
-# ---------------------------------------------------------------------------
-# Admin key guard
-# ---------------------------------------------------------------------------
-
-
 def _get_admin_key_header(x_admin_key: str | None = Header(default=None)) -> str | None:
     return x_admin_key
 
 
 def _require_admin_key(x_admin_key: str | None = Depends(_get_admin_key_header)) -> None:
-    """Raise 401 if MEMORY_LAYER_ADMIN_KEY env var is set and header doesn't match."""
     expected = os.environ.get("MEMORY_LAYER_ADMIN_KEY", "")
     if expected and x_admin_key != expected:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing MEMORY_LAYER_ADMIN_KEY header.",
         )
-
-
-# ---------------------------------------------------------------------------
-# 1. Write memory
-# ---------------------------------------------------------------------------
 
 
 @app.post("/v1/memories:write", response_model=WriteMemoryResponseModel, tags=["memories"])
@@ -243,11 +194,6 @@ async def write_memory(
         accepted_at=result.accepted_at,
         idempotent=result.idempotent,
     )
-
-
-# ---------------------------------------------------------------------------
-# 2. Search memories
-# ---------------------------------------------------------------------------
 
 
 @app.post(
@@ -301,11 +247,6 @@ async def search_memories(
     )
 
 
-# ---------------------------------------------------------------------------
-# 3. Recall memories
-# ---------------------------------------------------------------------------
-
-
 @app.post(
     "/v1/memories:recall", response_model=RecallMemoryResponseModel, tags=["memories"]
 )
@@ -353,11 +294,6 @@ async def recall_memories(
     )
 
 
-# ---------------------------------------------------------------------------
-# 4. Get memory by ID
-# ---------------------------------------------------------------------------
-
-
 @app.get("/v1/memories/{memory_id}", tags=["memories"])
 async def get_memory(
     memory_id: str,
@@ -377,11 +313,6 @@ async def get_memory(
     }
 
 
-# ---------------------------------------------------------------------------
-# 5. Delete memory
-# ---------------------------------------------------------------------------
-
-
 @app.delete(
     "/v1/memories/{memory_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -398,11 +329,6 @@ async def delete_memory(
         tenant_id=TenantId(tenant_id),
         actor=actor,
     )
-
-
-# ---------------------------------------------------------------------------
-# 6. Explain recall trace
-# ---------------------------------------------------------------------------
 
 
 @app.get("/v1/traces/{trace_id}", response_model=ExplainRecallResponseModel, tags=["traces"])
@@ -430,11 +356,6 @@ async def explain_recall(
     )
 
 
-# ---------------------------------------------------------------------------
-# 7. Session end
-# ---------------------------------------------------------------------------
-
-
 @app.post(
     "/v1/sessions/{session_id}:end",
     status_code=status.HTTP_202_ACCEPTED,
@@ -456,11 +377,6 @@ async def session_end(
     return {"status": "accepted"}
 
 
-# ---------------------------------------------------------------------------
-# 8. Admin: decay
-# ---------------------------------------------------------------------------
-
-
 @app.post(
     "/v1/admin/tenants/{tenant_id}:decay",
     response_model=DecayResponseModel,
@@ -472,11 +388,6 @@ async def admin_decay(
 ) -> DecayResponseModel:
     count = await use_case.execute(tenant_id=TenantId(tenant_id))
     return DecayResponseModel(tenant_id=tenant_id, transitions=count)
-
-
-# ---------------------------------------------------------------------------
-# 9. Admin: consolidate
-# ---------------------------------------------------------------------------
 
 
 @app.post(
@@ -492,11 +403,6 @@ async def admin_consolidate(
     return ConsolidateResponseModel(tenant_id=tenant_id, records_processed=count)
 
 
-# ---------------------------------------------------------------------------
-# 10. Admin: run migrations
-# ---------------------------------------------------------------------------
-
-
 @app.post(
     "/v1/admin/migrations:run",
     tags=["admin"],
@@ -505,14 +411,8 @@ async def admin_consolidate(
 async def admin_run_migrations(
     migrator: Any = Depends(get_schema_migrator),
 ) -> dict[str, Any]:
-    """Apply all pending schema migrations.
-
-    Gated by ``MEMORY_LAYER_ADMIN_KEY`` header when the env var is set.
-    Returns a :class:`~memory_layer.adapters.postgres.migrator.MigrationResult`
-    serialised as JSON.
-    """
-    from memory_layer.adapters.postgres.migrator import MigrationResult
+    """Apply all pending schema migrations."""
     from dataclasses import asdict as _asdict
 
-    result: MigrationResult = await migrator.run()
-    return _asdict(result)  # type: ignore[return-value]
+    result = await migrator.run()
+    return _asdict(result)
