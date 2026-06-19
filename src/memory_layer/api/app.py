@@ -74,6 +74,15 @@ def get_health_checker() -> HealthChecker:
     return _health_checker
 
 
+def create_app() -> FastAPI:
+    """Application factory for ``uvicorn --factory`` and test bootstrapping.
+
+    Returns the singleton :data:`app` instance.  Uvicorn calls this when
+    invoked as ``uvicorn memory_layer.api.app:create_app --factory``.
+    """
+    return app
+
+
 # ---------------------------------------------------------------------------
 # /metrics endpoint (registered only when metrics_enabled)
 # ---------------------------------------------------------------------------
