@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  memory-layer-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: memory-layer:latest
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      MEMORY_LAYER_STORAGE__VECTOR_BACKEND: chroma
+      MEMORY_LAYER_STORAGE__CHROMA_PATH: http://chroma:8000
+    depends_on:
+      chroma:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:8000/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma-data:/chroma/.chroma/index
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+
+volumes:
+  chroma-data:
+  prometheus-data:
