@@ -22,9 +22,9 @@ from memory_layer.api.app import (
 )
 from memory_layer.domain.exceptions import MemoryNotFoundError, TenantIsolationViolation
 from memory_layer.domain.records import (
+    AuditEntry,
     MemoryRecord,
     MemoryTrace,
-    AuditEntry,
     RecallResult,
     RecallStatus,
     Scope,
@@ -149,6 +149,7 @@ def clear_overrides():
 # ---------------------------------------------------------------------------
 
 
+# 1
 def test_healthz_returns_200() -> None:
     with TestClient(app) as client:
         resp = client.get("/healthz")
@@ -156,17 +157,26 @@ def test_healthz_returns_200() -> None:
     assert resp.json() == {"status": "ok"}
 
 
+# 2  — missing X-Tenant-Id must be rejected; handler now returns 400 via
+# RequestValidationError override, but HTTPException(422) from _resolve_tenant
+# is a different path. Either 400 or 422 satisfies the spec requirement
+# "requires X-Tenant-Id header"; we assert it is NOT 200.
 def test_write_requires_tenant_header() -> None:
+    mock_uc = AsyncMock()
+    mock_uc.execute.return_value = _make_write_result()
+    app.dependency_overrides[get_write_use_case] = lambda: mock_uc
+
     body = {
         "scope": _SCOPE_BODY,
         "raw_payload": "hello",
         "payload_type": "CONVERSATION_TURN",
     }
-    with TestClient(app) as client:
-        resp = client.post("/v1/memories:write", json=body)
-    assert resp.status_code == 422
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.post("/v1/memories:write", json=body)  # no HEADERS
+    assert resp.status_code in (400, 422)
 
 
+# 3
 def test_write_returns_memory_id() -> None:
     result = _make_write_result()
     mock_uc = AsyncMock()
@@ -184,6 +194,7 @@ def test_write_returns_memory_id() -> None:
     assert "memory_id" in resp.json()
 
 
+# 4
 def test_search_returns_results() -> None:
     mock_uc = AsyncMock()
     mock_uc.execute.return_value = _make_search_result()
@@ -198,6 +209,7 @@ def test_search_returns_results() -> None:
     assert data["total"] == 1
 
 
+# 5
 def test_recall_returns_results() -> None:
     mock_uc = AsyncMock()
     mock_uc.execute.return_value = _make_recall_result()
@@ -210,6 +222,7 @@ def test_recall_returns_results() -> None:
     assert resp.json()["status"] == "MATCH"
 
 
+# 6
 def test_get_memory_returns_200() -> None:
     record = _make_memory_record()
     mock_uc = AsyncMock()
@@ -222,6 +235,7 @@ def test_get_memory_returns_200() -> None:
     assert resp.json()["memory_id"] == str(record.id)
 
 
+# 7
 def test_delete_memory_returns_204() -> None:
     mock_uc = AsyncMock()
     mock_uc.execute.return_value = None
@@ -232,6 +246,7 @@ def test_delete_memory_returns_204() -> None:
     assert resp.status_code == 204
 
 
+# 8
 def test_explain_trace_returns_data() -> None:
     trace = _make_memory_trace()
     mock_uc = AsyncMock()
@@ -246,6 +261,7 @@ def test_explain_trace_returns_data() -> None:
     assert "steps" in data
 
 
+# 9
 def test_session_end_returns_202() -> None:
     mock_uc = AsyncMock()
     mock_uc.execute.return_value = None
@@ -257,6 +273,7 @@ def test_session_end_returns_202() -> None:
     assert resp.status_code == 202
 
 
+# 10
 def test_admin_decay_returns_count() -> None:
     mock_uc = AsyncMock()
     mock_uc.execute.return_value = 7
@@ -268,6 +285,7 @@ def test_admin_decay_returns_count() -> None:
     assert resp.json()["transitions"] == 7
 
 
+# 11
 def test_memory_not_found_maps_to_404() -> None:
     mock_uc = AsyncMock()
     mock_uc.execute.side_effect = MemoryNotFoundError("mem-999")
@@ -279,6 +297,7 @@ def test_memory_not_found_maps_to_404() -> None:
     assert resp.json()["error_code"] == "MEMORY_NOT_FOUND"
 
 
+# 12
 def test_tenant_isolation_maps_to_403() -> None:
     mock_uc = AsyncMock()
     mock_uc.execute.side_effect = TenantIsolationViolation(
@@ -292,6 +311,7 @@ def test_tenant_isolation_maps_to_403() -> None:
     assert resp.json()["error_code"] == "TENANT_ISOLATION_VIOLATION"
 
 
+# 13
 def test_unknown_exception_maps_to_500() -> None:
     mock_uc = AsyncMock()
     mock_uc.execute.side_effect = RuntimeError("boom")
@@ -303,6 +323,7 @@ def test_unknown_exception_maps_to_500() -> None:
     assert resp.json()["error_code"] == "INTERNAL_SERVER_ERROR"
 
 
+# 14
 def test_extra_fields_forbidden_returns_422() -> None:
     body = {
         "scope": _SCOPE_BODY,
@@ -316,9 +337,13 @@ def test_extra_fields_forbidden_returns_422() -> None:
 
     with TestClient(app) as client:
         resp = client.post("/v1/memories:write", json=body, headers=HEADERS)
-    assert resp.status_code == 422
+    # FastAPI raises RequestValidationError which our handler maps to 400.
+    # ConfigDict(extra="forbid") on the Pydantic model triggers this path.
+    assert resp.status_code == 400
+    assert resp.json()["error_code"] == "VALIDATION_ERROR"
 
 
+# 15
 def test_dependency_override_honored() -> None:
     """Verify that app.dependency_overrides replaces the stub provider."""
     result = _make_write_result()

@@ -7,6 +7,7 @@ import traceback
 from typing import Any
 
 from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError as PydanticValidationError
 
@@ -19,6 +20,9 @@ from memory_layer.domain.exceptions import (
 )
 
 log = logging.getLogger(__name__)
+
+# Alias so code that raises TenantIsolationError (spec name) also works.
+TenantIsolationError = TenantIsolationViolation
 
 
 def _error_response(
@@ -76,6 +80,24 @@ async def capability_not_available_handler(
 async def pydantic_validation_handler(
     request: Request, exc: PydanticValidationError
 ) -> JSONResponse:
+    """Handle Pydantic ValidationError raised outside FastAPI's normal request cycle."""
+    return _error_response(
+        400,
+        "VALIDATION_ERROR",
+        "Request validation failed.",
+        details={"errors": exc.errors()},
+    )
+
+
+async def request_validation_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Handle FastAPI RequestValidationError (path / query / header / body parse errors).
+
+    FastAPI raises this for all request-level validation failures and returns
+    422 by default. We override it to return 400 with ErrorResponseModel so
+    all validation failures have a uniform shape.
+    """
     return _error_response(
         400,
         "VALIDATION_ERROR",
@@ -109,15 +131,23 @@ async def generic_exception_handler(
 def register_exception_handlers(app: Any) -> None:
     """Register all exception handlers onto *app*.
 
-    More-specific handlers must be registered before generic ones because
-    FastAPI/Starlette matches by MRO order when the same exception class
-    appears multiple times.
+    Handler registration order: most-specific first.
+    FastAPI/Starlette matches by the exception class's MRO, so subclass
+    handlers must be registered before their base-class handlers.
     """
+    # 404
     app.add_exception_handler(MemoryNotFoundError, memory_not_found_handler)
+    # 403
     app.add_exception_handler(TenantIsolationViolation, tenant_isolation_handler)
+    # 409
     app.add_exception_handler(
         CapabilityNotAvailableError, capability_not_available_handler
     )
+    # 400 — FastAPI request-level validation (path / query / header / body)
+    app.add_exception_handler(RequestValidationError, request_validation_handler)
+    # 400 — Pydantic ValidationError raised programmatically
     app.add_exception_handler(PydanticValidationError, pydantic_validation_handler)
+    # 400 — remaining domain errors
     app.add_exception_handler(MemoryLayerError, memory_layer_error_handler)
+    # 500 — everything else
     app.add_exception_handler(Exception, generic_exception_handler)
