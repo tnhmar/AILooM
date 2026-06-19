@@ -62,10 +62,25 @@ app = FastAPI(title="memory-layer", version="0.1.0")
 app.add_middleware(TenantMiddleware)
 register_exception_handlers(app)
 
+# ---------------------------------------------------------------------------
+# /metrics endpoint (registered only when metrics_enabled)
+# ---------------------------------------------------------------------------
+
+try:
+    from memory_layer.config.loader import get_settings
+    from memory_layer.observability.metrics import metrics_response
+
+    _obs = get_settings().observability
+    if _obs.metrics_enabled:
+        @app.get("/metrics", tags=["ops"], include_in_schema=False)
+        async def _metrics_endpoint() -> object:
+            return metrics_response()
+except Exception:
+    pass  # metrics not available — skip registration silently
+
 
 # ---------------------------------------------------------------------------
 # Dependency stubs
-# (Leave as NotImplementedError; tests override via app.dependency_overrides)
 # ---------------------------------------------------------------------------
 
 
@@ -111,8 +126,7 @@ def get_consolidate_use_case() -> ConsolidateUseCase:
 
 
 def _scope_from_model(tenant_id: TenantId, m: object) -> Scope:
-    """Build a domain Scope from a ScopeModel-bearing request model attribute."""
-    from memory_layer.api.schemas import ScopeModel  # local to avoid circular
+    from memory_layer.api.schemas import ScopeModel
 
     assert isinstance(m, ScopeModel)
     return Scope(
