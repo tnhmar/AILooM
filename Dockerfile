@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # ---------------------------------------------------------------------------
 # Stage 1: builder
 # ---------------------------------------------------------------------------
@@ -7,11 +8,20 @@ RUN pip install uv
 
 WORKDIR /app
 
+# Copy dependency manifest + lock file first so Docker can cache this layer.
+# uv.lock MUST be committed to the repository; if it is missing the build
+# fails here with a clear error before any source code is copied.
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project
 
+# Install dependencies only (not the project package itself) and cache the
+# uv download cache across rebuilds via BuildKit mount cache.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-install-project --extra postgres
+
+# Now copy source and install the project itself.
 COPY src/ ./src/
-RUN uv sync --frozen
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --extra postgres
 
 # ---------------------------------------------------------------------------
 # Stage 2: runtime
