@@ -9,26 +9,15 @@ on:
 jobs:
   # ---------------------------------------------------------------------------
   # Lock-file consistency gate
-  #
-  # Strategy:
-  #   1. Run `uv lock` (always regenerates from pyproject.toml).
-  #   2. If the result differs from the committed uv.lock, auto-commit the
-  #      updated file back to the branch (push events only).
-  #   3. On pull_request events we cannot push back, so we run `uv lock --check`
-  #      and fail loudly so the author knows to run `uv lock` locally.
-  #
-  # All downstream jobs depend on this job so a bad lock never wastes
-  # runner-minutes on builds that would fail anyway.
   # ---------------------------------------------------------------------------
   lock-check:
     name: Lock-file check
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # needed for auto-commit on push events
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
-          # Fetch the full ref so the auto-commit action can push.
           ref: ${{ github.head_ref || github.ref_name }}
           fetch-depth: 0
 
@@ -40,11 +29,12 @@ jobs:
       - name: Install uv
         run: pip install uv
 
-      # Always regenerate so the lock is authoritative.
+      # Delete any stub/invalid lock file so uv regenerates from scratch.
       - name: Regenerate uv.lock
-        run: uv lock
+        run: |
+          rm -f uv.lock
+          uv lock
 
-      # On push: auto-commit updated lock file if it changed.
       - name: Auto-commit uv.lock if changed (push only)
         if: github.event_name == 'push'
         uses: stefanzweifel/git-auto-commit-action@v5
@@ -54,7 +44,6 @@ jobs:
           commit_user_name: "github-actions[bot]"
           commit_user_email: "github-actions[bot]@users.noreply.github.com"
 
-      # On pull_request: fail if the lock would change (author must run `uv lock`).
       - name: Verify uv.lock is up-to-date (PR only)
         if: github.event_name == 'pull_request'
         run: |

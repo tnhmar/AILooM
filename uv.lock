@@ -1,3 +1,2 @@
-# This file is intentionally minimal and will be replaced by `uv lock`
-# on the first CI run of the lock-check job.
-# See .github/workflows/ci.yml job: lock-check.
+version = 1
+requires-python = ">=3.11"
