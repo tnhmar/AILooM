@@ -72,8 +72,9 @@ jobs:
       - name: Install uv
         run: pip install uv
 
+      # ruff is declared under [project.optional-dependencies] dev
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --extra dev
 
       - name: ruff check
         run: uv run ruff check src/ tests/
@@ -101,8 +102,9 @@ jobs:
       - name: Install uv
         run: pip install uv
 
+      # mypy is declared under [project.optional-dependencies] dev
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --extra dev
 
       - name: mypy strict
         run: uv run mypy src/ --strict --ignore-missing-imports
@@ -127,8 +129,9 @@ jobs:
       - name: Install uv
         run: pip install uv
 
+      # pytest, pytest-asyncio, pytest-cov are declared under dev extra
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --extra dev
 
       - name: Run tests with coverage
         run: |
@@ -176,9 +179,8 @@ jobs:
             --no-emit-project \
             > requirements.txt
 
-      # --ignore-vuln suppresses CVE-2026-45829 for the chromadb entry that
-      # may appear if chromadb is resolved as a transitive dep of another
-      # package.  The primary mitigation is exclusion from the export above.
+      # --ignore-vuln suppresses CVE-2026-45829 for any chromadb entry that
+      # may appear as a transitive dep. Primary mitigation is exclusion above.
       # Re-evaluate by 2026-09-19 (see .pip-audit-ignore.toml).
       - name: pip-audit
         run: |
@@ -236,8 +238,9 @@ jobs:
       - name: Install uv
         run: pip install uv
 
+      # pytest and benchmark plugins are declared under dev extra
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --extra dev
 
       - name: Run benchmark tests
         run: |
