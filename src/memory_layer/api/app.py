@@ -7,9 +7,10 @@ No business logic lives here.
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict
 
-from fastapi import Depends, FastAPI, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from starlette.requests import Request
 
 from memory_layer.api.errors import register_exception_handlers
@@ -167,6 +168,11 @@ def get_consolidate_use_case() -> ConsolidateUseCase:
     raise NotImplementedError("ConsolidateUseCase provider not configured.")
 
 
+def get_schema_migrator():
+    """Return the configured SchemaMigrator; override at startup."""
+    raise NotImplementedError("SchemaMigrator provider not configured.")
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -184,6 +190,25 @@ def _scope_from_model(tenant_id: TenantId, m: object) -> Scope:
         session_id=SessionId(m.session_id) if m.session_id else None,
         run_id=RunId(m.run_id) if m.run_id else None,
     )
+
+
+# ---------------------------------------------------------------------------
+# Admin key guard
+# ---------------------------------------------------------------------------
+
+
+def _get_admin_key_header(x_admin_key: str | None = Header(default=None)) -> str | None:
+    return x_admin_key
+
+
+def _require_admin_key(x_admin_key: str | None = Depends(_get_admin_key_header)) -> None:
+    """Raise 401 if MEMORY_LAYER_ADMIN_KEY env var is set and header doesn't match."""
+    expected = os.environ.get("MEMORY_LAYER_ADMIN_KEY", "")
+    if expected and x_admin_key != expected:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing MEMORY_LAYER_ADMIN_KEY header.",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -464,3 +489,29 @@ async def admin_consolidate(
 ) -> ConsolidateResponseModel:
     count = await use_case.execute(tenant_id=TenantId(tenant_id))
     return ConsolidateResponseModel(tenant_id=tenant_id, records_processed=count)
+
+
+# ---------------------------------------------------------------------------
+# 10. Admin: run migrations
+# ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/v1/admin/migrations:run",
+    tags=["admin"],
+    dependencies=[Depends(_require_admin_key)],
+)
+async def admin_run_migrations(
+    migrator=Depends(get_schema_migrator),
+) -> dict:
+    """Apply all pending schema migrations.
+
+    Gated by ``MEMORY_LAYER_ADMIN_KEY`` header when the env var is set.
+    Returns a :class:`~memory_layer.adapters.postgres.migrator.MigrationResult`
+    serialised as JSON.
+    """
+    from memory_layer.adapters.postgres.migrator import MigrationResult
+    from dataclasses import asdict as _asdict
+
+    result: MigrationResult = await migrator.run()
+    return _asdict(result)
