@@ -7,9 +7,11 @@ No business logic lives here.
 
 from __future__ import annotations
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, status
+from starlette.requests import Request
 
 from memory_layer.api.errors import register_exception_handlers
+from memory_layer.api.middleware import TenantMiddleware, get_request_tenant_id
 from memory_layer.api.schemas import (
     ConsolidateResponseModel,
     DecayResponseModel,
@@ -57,6 +59,7 @@ from memory_layer.ports.inbound import (
 # ---------------------------------------------------------------------------
 
 app = FastAPI(title="memory-layer", version="0.1.0")
+app.add_middleware(TenantMiddleware)
 register_exception_handlers(app)
 
 
@@ -107,15 +110,6 @@ def get_consolidate_use_case() -> ConsolidateUseCase:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_tenant(x_tenant_id: str | None) -> TenantId:
-    if not x_tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="X-Tenant-Id header is required.",
-        )
-    return TenantId(x_tenant_id)
-
-
 def _scope_from_model(tenant_id: TenantId, m: object) -> Scope:
     """Build a domain Scope from a ScopeModel-bearing request model attribute."""
     from memory_layer.api.schemas import ScopeModel  # local to avoid circular
@@ -149,13 +143,13 @@ async def healthz() -> dict[str, str]:
 @app.post("/v1/memories:write", response_model=WriteMemoryResponseModel, tags=["memories"])
 async def write_memory(
     body: WriteMemoryRequestModel,
-    x_tenant_id: str | None = Header(default=None),
+    tenant_id: str = Depends(get_request_tenant_id),
     use_case: WriteMemoryUseCase = Depends(get_write_use_case),
 ) -> WriteMemoryResponseModel:
-    tenant_id = _resolve_tenant(x_tenant_id)
-    scope = _scope_from_model(tenant_id, body.scope)
+    t_id = TenantId(tenant_id)
+    scope = _scope_from_model(t_id, body.scope)
     request = WriteRequest(
-        tenant_id=tenant_id,
+        tenant_id=t_id,
         scope=scope,
         raw_payload=body.raw_payload,
         payload_type=body.payload_type,
@@ -184,14 +178,14 @@ async def write_memory(
 )
 async def search_memories(
     body: SearchMemoryRequestModel,
-    x_tenant_id: str | None = Header(default=None),
+    tenant_id: str = Depends(get_request_tenant_id),
     use_case: SearchMemoryUseCase = Depends(get_search_use_case),
 ) -> SearchMemoryResponseModel:
-    tenant_id = _resolve_tenant(x_tenant_id)
-    scope = _scope_from_model(tenant_id, body.scope)
+    t_id = TenantId(tenant_id)
+    scope = _scope_from_model(t_id, body.scope)
     tf = body.temporal_filter
     request = SearchRequest(
-        tenant_id=tenant_id,
+        tenant_id=t_id,
         scope=scope,
         query=body.query,
         mode=body.mode,
@@ -209,7 +203,7 @@ async def search_memories(
         k=body.k,
     )
     result = await use_case.execute(request)
-    from memory_layer.api.schemas import SearchResultItemModel  # local import ok
+    from memory_layer.api.schemas import SearchResultItemModel
 
     return SearchMemoryResponseModel(
         items=[
@@ -240,13 +234,13 @@ async def search_memories(
 )
 async def recall_memories(
     body: RecallMemoryRequestModel,
-    x_tenant_id: str | None = Header(default=None),
+    tenant_id: str = Depends(get_request_tenant_id),
     use_case: RecallMemoryUseCase = Depends(get_recall_use_case),
 ) -> RecallMemoryResponseModel:
-    tenant_id = _resolve_tenant(x_tenant_id)
-    scope = _scope_from_model(tenant_id, body.scope)
+    t_id = TenantId(tenant_id)
+    scope = _scope_from_model(t_id, body.scope)
     request = RecallRequest(
-        tenant_id=tenant_id,
+        tenant_id=t_id,
         scope=scope,
         query=body.query,
         max_tokens=body.max_tokens,
@@ -257,7 +251,7 @@ async def recall_memories(
         mode=body.mode,
     )
     result = await use_case.execute(request)
-    from memory_layer.api.schemas import RecallItemModel  # local import ok
+    from memory_layer.api.schemas import RecallItemModel
 
     return RecallMemoryResponseModel(
         status=result.status,
@@ -290,12 +284,11 @@ async def recall_memories(
 @app.get("/v1/memories/{memory_id}", tags=["memories"])
 async def get_memory(
     memory_id: str,
-    x_tenant_id: str | None = Header(default=None),
+    tenant_id: str = Depends(get_request_tenant_id),
     use_case: GetMemoryUseCase = Depends(get_get_memory_use_case),
 ) -> dict[str, object]:
-    tenant_id = _resolve_tenant(x_tenant_id)
     record = await use_case.execute(
-        memory_id=MemoryId(memory_id), tenant_id=tenant_id
+        memory_id=MemoryId(memory_id), tenant_id=TenantId(tenant_id)
     )
     return {
         "memory_id": str(record.id),
@@ -320,13 +313,12 @@ async def get_memory(
 async def delete_memory(
     memory_id: str,
     actor: str = "api",
-    x_tenant_id: str | None = Header(default=None),
+    tenant_id: str = Depends(get_request_tenant_id),
     use_case: DeleteMemoryUseCase = Depends(get_delete_use_case),
 ) -> None:
-    tenant_id = _resolve_tenant(x_tenant_id)
     await use_case.execute(
         memory_id=MemoryId(memory_id),
-        tenant_id=tenant_id,
+        tenant_id=TenantId(tenant_id),
         actor=actor,
     )
 
@@ -339,18 +331,16 @@ async def delete_memory(
 @app.get("/v1/traces/{trace_id}", response_model=ExplainRecallResponseModel, tags=["traces"])
 async def explain_recall(
     trace_id: str,
-    x_tenant_id: str | None = Header(default=None),
+    tenant_id: str = Depends(get_request_tenant_id),
     use_case: ExplainRecallUseCase = Depends(get_explain_use_case),
 ) -> ExplainRecallResponseModel:
-    tenant_id = _resolve_tenant(x_tenant_id)
-    # ExplainRecallUseCase returns MemoryTrace (provenance trace)
     trace = await use_case.execute(
-        trace_id=TraceId(trace_id), tenant_id=tenant_id
+        trace_id=TraceId(trace_id), tenant_id=TenantId(tenant_id)
     )
     return ExplainRecallResponseModel(
         trace_id=str(trace.trace_id),
         tenant_id=str(trace.scope.tenant_id),
-        query=str(trace.trace_id),  # MemoryTrace has no query field; use trace_id as ref
+        query=str(trace.trace_id),
         mode="provenance",
         steps=[
             TraceStepModel(
@@ -376,13 +366,13 @@ async def explain_recall(
 async def session_end(
     session_id: str,
     body: SessionEndRequestModel,
-    x_tenant_id: str | None = Header(default=None),
+    tenant_id: str = Depends(get_request_tenant_id),
     use_case: NotifySessionEndedUseCase = Depends(get_notify_session_ended_use_case),
 ) -> dict[str, str]:
-    tenant_id = _resolve_tenant(x_tenant_id)
-    scope = _scope_from_model(tenant_id, body.scope)
+    t_id = TenantId(tenant_id)
+    scope = _scope_from_model(t_id, body.scope)
     await use_case.execute(
-        tenant_id=tenant_id,
+        tenant_id=t_id,
         session_id=SessionId(session_id),
         scope=scope,
     )
