@@ -7,10 +7,13 @@ No business logic lives here.
 
 from __future__ import annotations
 
-from fastapi import Depends, FastAPI, status
+from dataclasses import asdict
+
+from fastapi import Depends, FastAPI, Response, status
 from starlette.requests import Request
 
 from memory_layer.api.errors import register_exception_handlers
+from memory_layer.api.health import HealthChecker, HealthReport
 from memory_layer.api.middleware import TenantMiddleware, get_request_tenant_id
 from memory_layer.api.schemas import (
     ConsolidateResponseModel,
@@ -62,6 +65,15 @@ app = FastAPI(title="memory-layer", version="0.1.0")
 app.add_middleware(TenantMiddleware)
 register_exception_handlers(app)
 
+# Module-level HealthChecker singleton — callers may register probes at boot.
+_health_checker = HealthChecker(version="0.1.0")
+
+
+def get_health_checker() -> HealthChecker:
+    """Return the application-level HealthChecker."""
+    return _health_checker
+
+
 # ---------------------------------------------------------------------------
 # /metrics endpoint (registered only when metrics_enabled)
 # ---------------------------------------------------------------------------
@@ -76,7 +88,33 @@ try:
         async def _metrics_endpoint() -> object:
             return metrics_response()
 except Exception:
-    pass  # metrics not available — skip registration silently
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Health / readiness
+# ---------------------------------------------------------------------------
+
+
+@app.get("/healthz", tags=["ops"])
+async def healthz(
+    checker: HealthChecker = Depends(get_health_checker),
+) -> dict:
+    """Deep liveness probe — always returns 200 with a HealthReport JSON body."""
+    report: HealthReport = await checker.check()
+    return asdict(report)
+
+
+@app.get("/readyz", tags=["ops"])
+async def readyz(
+    response: Response,
+    checker: HealthChecker = Depends(get_health_checker),
+) -> dict:
+    """Readiness probe — 200 when all components ok, 503 otherwise."""
+    report: HealthReport = await checker.check()
+    if report.status != "ok":
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return asdict(report)
 
 
 # ---------------------------------------------------------------------------
@@ -137,16 +175,6 @@ def _scope_from_model(tenant_id: TenantId, m: object) -> Scope:
         session_id=SessionId(m.session_id) if m.session_id else None,
         run_id=RunId(m.run_id) if m.run_id else None,
     )
-
-
-# ---------------------------------------------------------------------------
-# Health
-# ---------------------------------------------------------------------------
-
-
-@app.get("/healthz", tags=["ops"])
-async def healthz() -> dict[str, str]:
-    return {"status": "ok"}
 
 
 # ---------------------------------------------------------------------------
