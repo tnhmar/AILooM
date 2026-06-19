@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP  # type: ignore[import-untyped]
 
 from memory_layer.sdk.client import MemoryLayerClient
 from memory_layer.sdk.models import (
@@ -49,7 +49,7 @@ def build_client(tenant_id: str) -> MemoryLayerClient:
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool()
+@mcp.tool()  # type: ignore[misc]
 async def write_memory(
     tenant_id: str,
     principal_id: str,
@@ -94,7 +94,7 @@ async def write_memory(
     }
 
 
-@mcp.tool()
+@mcp.tool()  # type: ignore[misc]
 async def search_memory(
     tenant_id: str,
     principal_id: str,
@@ -146,7 +146,7 @@ async def search_memory(
     }
 
 
-@mcp.tool()
+@mcp.tool()  # type: ignore[misc]
 async def recall_memory(
     tenant_id: str,
     principal_id: str,
@@ -201,7 +201,7 @@ async def recall_memory(
     }
 
 
-@mcp.tool()
+@mcp.tool()  # type: ignore[misc]
 async def explain_trace(
     tenant_id: str,
     trace_id: str,
@@ -237,7 +237,7 @@ async def explain_trace(
     }
 
 
-@mcp.tool()
+@mcp.tool()  # type: ignore[misc]
 async def get_memory(
     tenant_id: str,
     memory_id: str,
@@ -257,7 +257,7 @@ async def get_memory(
         return await client.get_memory(memory_id)
 
 
-@mcp.tool()
+@mcp.tool()  # type: ignore[misc]
 async def delete_memory(
     tenant_id: str,
     memory_id: str,
@@ -280,7 +280,7 @@ async def delete_memory(
     return {"deleted": True, "memory_id": memory_id}
 
 
-@mcp.tool()
+@mcp.tool()  # type: ignore[misc]
 async def end_session(
     tenant_id: str,
     session_id: str,

@@ -10,7 +10,7 @@ Call :func:`configure_tracing` once at startup, then obtain tracers via
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Any, Generator
+from typing import Any, Generator, Literal
 
 from memory_layer.config.settings import ObservabilitySettings
 
@@ -157,7 +157,12 @@ class _NoOpSpan:
     def __enter__(self) -> "_NoOpSpan":
         return self
 
-    def __exit__(self, *args: Any) -> bool:
+    def __exit__(
+        self,
+        exc_type: object,
+        exc_val: object,
+        exc_tb: object,
+    ) -> Literal[False]:
         return False
 
 

@@ -13,12 +13,16 @@ Skip rules (applied in order):
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
 from memory_layer.api.tenant import resolve_tenant_id
+
+_CallNext = Callable[[Request], Awaitable[Response]]
 
 
 class TenantMiddleware(BaseHTTPMiddleware):
@@ -34,24 +38,19 @@ class TenantMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
 
-    async def dispatch(self, request: Request, call_next: object) -> Response:
-        from collections.abc import Callable
-        from starlette.responses import Response as _Response
-
-        _call_next: Callable[[Request], object] = call_next  # type: ignore[assignment]
-
+    async def dispatch(self, request: Request, call_next: _CallNext) -> Response:
         path: str = request.url.path
 
         if not path.startswith("/v1/") or path.startswith("/v1/admin/"):
             # /healthz, /docs, /openapi.json and all admin routes bypass
             # header-based tenant resolution.
-            return await _call_next(request)  # type: ignore[return-value]
+            return await call_next(request)
 
         # resolve_tenant_id raises TenantIsolationViolation on failure;
         # FastAPI's exception handler converts this to a 403 JSON response.
         tenant_id = resolve_tenant_id(request)
         request.state.tenant_id = tenant_id
-        return await _call_next(request)  # type: ignore[return-value]
+        return await call_next(request)
 
 
 def get_request_tenant_id(request: Request) -> str:

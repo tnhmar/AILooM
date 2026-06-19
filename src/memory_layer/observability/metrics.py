@@ -29,9 +29,9 @@ try:
     _PROM_AVAILABLE = True
 except ImportError:
     _PROM_AVAILABLE = False
-    Counter = None  # type: ignore[misc,assignment]
-    Gauge = None  # type: ignore[misc,assignment]
-    Histogram = None  # type: ignore[misc,assignment]
+    Counter = None  # type: ignore[assignment]
+    Gauge = None  # type: ignore[assignment]
+    Histogram = None  # type: ignore[assignment]
     CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
     generate_latest = None  # type: ignore[assignment]
 

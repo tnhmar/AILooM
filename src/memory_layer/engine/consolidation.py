@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from memory_layer.domain.records import Scope
 from memory_layer.domain.types import LifecycleState, TenantId
 from memory_layer.ports.outbound import AuditLogPort, MemoryRecordRepositoryPort
 
@@ -24,7 +25,9 @@ class ConsolidationService:
         self._audit_log = audit_log
         self._llm = llm_client
 
-    async def execute(self, tenant_id: TenantId) -> int:
+    async def execute(
+        self, tenant_id: TenantId, scope: Scope | None = None
+    ) -> int:
         """Run consolidation pass for *tenant_id* and return records processed."""
         from memory_layer.observability.metrics import memory_consolidations_total
 

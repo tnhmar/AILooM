@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import asyncpg
 
@@ -81,7 +81,7 @@ class SchemaMigrator:
 
     def __init__(
         self,
-        pool: asyncpg.Pool,
+        pool: asyncpg.Pool[asyncpg.Record],
         observer: ObserverPort,
         tenant_id: str = "system",
     ) -> None:
@@ -129,7 +129,9 @@ class SchemaMigrator:
         async with self._pool.acquire() as conn:
             await conn.execute(_MIGRATIONS_TABLE_DDL)
 
-    async def _is_applied(self, conn: asyncpg.Connection, version: str) -> bool:  # type: ignore[type-arg]
+    async def _is_applied(
+        self, conn: asyncpg.Connection[Any], version: str
+    ) -> bool:
         """Return True if *version* is already recorded in ``schema_migrations``."""
         row = await conn.fetchrow(
             "SELECT version FROM schema_migrations WHERE version = $1",
@@ -137,7 +139,9 @@ class SchemaMigrator:
         )
         return row is not None
 
-    async def _apply(self, conn: asyncpg.Connection, version: str, ddl: str) -> None:  # type: ignore[type-arg]
+    async def _apply(
+        self, conn: asyncpg.Connection[Any], version: str, ddl: str
+    ) -> None:
         """Execute *ddl* and record *version* in ``schema_migrations``."""
         await conn.execute(ddl)
         await conn.execute(

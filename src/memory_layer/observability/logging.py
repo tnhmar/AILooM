@@ -58,13 +58,13 @@ def configure_logging(settings: ObservabilitySettings, log_level: str = "INFO") 
             from pythonjsonlogger import jsonlogger  # type: ignore[import-untyped]
             JsonFormatter = jsonlogger.JsonFormatter  # type: ignore[assignment]
 
-        fmt = JsonFormatter(
+        fmt: logging.Formatter = JsonFormatter(
             fmt="%(asctime)s %(levelname)s %(name)s %(message)s "
                 "%(tenant_id)s %(trace_id)s %(component)s",
             rename_fields={"asctime": "timestamp", "levelname": "level", "name": "name"},
         )
     else:
-        fmt = logging.Formatter(  # type: ignore[assignment]
+        fmt = logging.Formatter(
             fmt="%(asctime)s [%(levelname)s] %(name)s %(message)s"
                 " tenant=%(tenant_id)s trace=%(trace_id)s component=%(component)s",
             datefmt="%Y-%m-%dT%H:%M:%S",

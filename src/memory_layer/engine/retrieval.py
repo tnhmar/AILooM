@@ -7,7 +7,7 @@ from datetime import datetime
 
 from memory_layer.domain.records import SearchRequest
 from memory_layer.ports.inbound import SearchResult, SearchResultItem
-from memory_layer.ports.outbound import MemoryRecordRepositoryPort, VectorStorePort
+from memory_layer.ports.outbound import MemoryRecordRepositoryPort, VectorIndexPort
 
 log = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class SearchMemoryService:
     def __init__(
         self,
         record_repo: MemoryRecordRepositoryPort,
-        vector_store: VectorStorePort | None = None,
+        vector_store: VectorIndexPort | None = None,
     ) -> None:
         self._record_repo = record_repo
         self._vector_store = vector_store

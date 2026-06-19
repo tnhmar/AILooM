@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import asdict
+from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from starlette.requests import Request
@@ -109,22 +110,22 @@ except Exception:
 @app.get("/healthz", tags=["ops"])
 async def healthz(
     checker: HealthChecker = Depends(get_health_checker),
-) -> dict:
+) -> dict[str, Any]:
     """Deep liveness probe — always returns 200 with a HealthReport JSON body."""
     report: HealthReport = await checker.check()
-    return asdict(report)
+    return asdict(report)  # type: ignore[return-value]
 
 
 @app.get("/readyz", tags=["ops"])
 async def readyz(
     response: Response,
     checker: HealthChecker = Depends(get_health_checker),
-) -> dict:
+) -> dict[str, Any]:
     """Readiness probe — 200 when all components ok, 503 otherwise."""
     report: HealthReport = await checker.check()
     if report.status != "ok":
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-    return asdict(report)
+    return asdict(report)  # type: ignore[return-value]
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +169,7 @@ def get_consolidate_use_case() -> ConsolidateUseCase:
     raise NotImplementedError("ConsolidateUseCase provider not configured.")
 
 
-def get_schema_migrator():
+def get_schema_migrator() -> Any:
     """Return the configured SchemaMigrator; override at startup."""
     raise NotImplementedError("SchemaMigrator provider not configured.")
 
@@ -502,8 +503,8 @@ async def admin_consolidate(
     dependencies=[Depends(_require_admin_key)],
 )
 async def admin_run_migrations(
-    migrator=Depends(get_schema_migrator),
-) -> dict:
+    migrator: Any = Depends(get_schema_migrator),
+) -> dict[str, Any]:
     """Apply all pending schema migrations.
 
     Gated by ``MEMORY_LAYER_ADMIN_KEY`` header when the env var is set.
@@ -514,4 +515,4 @@ async def admin_run_migrations(
     from dataclasses import asdict as _asdict
 
     result: MigrationResult = await migrator.run()
-    return _asdict(result)
+    return _asdict(result)  # type: ignore[return-value]

@@ -72,7 +72,7 @@ class PgvectorVectorIndex:
         declaration in :data:`VECTOR_INDEX_DDL`.  Defaults to 1536.
     """
 
-    def __init__(self, pool: asyncpg.Pool, dimensions: int = 1536) -> None:
+    def __init__(self, pool: asyncpg.Pool[asyncpg.Record], dimensions: int = 1536) -> None:
         self._pool = pool
         self._dimensions = dimensions
 

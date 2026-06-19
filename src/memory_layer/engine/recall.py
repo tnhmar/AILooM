@@ -5,10 +5,9 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from memory_layer.domain.records import RecallRequest
+from memory_layer.domain.records import RecallItem, RecallRequest, RecallResult, RecallStatus
 from memory_layer.domain.types import LifecycleState
-from memory_layer.ports.inbound import RecallResult, RecallStatus
-from memory_layer.ports.outbound import MemoryRecordRepositoryPort, VectorStorePort
+from memory_layer.ports.outbound import MemoryRecordRepositoryPort, VectorIndexPort
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +18,7 @@ class RecallMemoryService:
     def __init__(
         self,
         record_repo: MemoryRecordRepositoryPort,
-        vector_store: VectorStorePort | None = None,
+        vector_store: VectorIndexPort | None = None,
     ) -> None:
         self._record_repo = record_repo
         self._vector_store = vector_store
@@ -58,8 +57,6 @@ class RecallMemoryService:
                 recalled_at=datetime.utcnow(),
                 no_match_reason="No active memories found for this query.",
             )
-
-        from memory_layer.ports.inbound import RecallItem
 
         return RecallResult(
             status=RecallStatus.MATCH,

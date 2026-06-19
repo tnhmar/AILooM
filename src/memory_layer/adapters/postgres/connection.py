@@ -7,7 +7,7 @@ import asyncpg
 from memory_layer.config.settings import StorageSettings
 
 
-async def create_pool(settings: StorageSettings) -> asyncpg.Pool:
+async def create_pool(settings: StorageSettings) -> asyncpg.Pool[asyncpg.Record]:
     """Create and return an asyncpg connection pool.
 
     Parameters
@@ -34,14 +34,14 @@ async def create_pool(settings: StorageSettings) -> asyncpg.Pool:
     min_size: int = getattr(settings, "postgres_pool_min_size", 2)
     max_size: int = getattr(settings, "postgres_pool_max_size", 10)
 
-    pool: asyncpg.Pool = await asyncpg.create_pool(
+    pool: asyncpg.Pool[asyncpg.Record] = await asyncpg.create_pool(  # type: ignore[assignment]
         dsn=settings.postgres_dsn,
         min_size=min_size,
         max_size=max_size,
-    )  # type: ignore[assignment]
+    )
     return pool
 
 
-async def close_pool(pool: asyncpg.Pool) -> None:
+async def close_pool(pool: asyncpg.Pool[asyncpg.Record]) -> None:
     """Gracefully close all connections in *pool*."""
     await pool.close()

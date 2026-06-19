@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Literal, Optional
 
 from pydantic import BaseModel
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict  # type: ignore[import-untyped]
 
 
 class ServerSettings(BaseModel):
@@ -78,7 +78,7 @@ class ObservabilitySettings(BaseModel):
     log_json: bool = False
 
 
-class Settings(BaseSettings):
+class Settings(BaseSettings):  # type: ignore[misc]
     """Root settings object for memory-layer.
 
     Reads from env vars prefixed ``MEMORY_LAYER_`` with ``__`` as the nested

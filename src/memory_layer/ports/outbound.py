@@ -119,6 +119,37 @@ class MemoryRecordRepositoryPort(Protocol):
         self, key: str, tenant_id: TenantId
     ) -> MemoryRecord | None: ...
 
+    async def search(
+        self,
+        tenant_id: TenantId,
+        query: str,
+        mode: Any,
+        sectors: list[MemorySector] | None,
+        lifecycle_states: list[LifecycleState],
+        temporal_filter: Any | None,
+        k: int,
+        scope: Scope,
+    ) -> list[MemoryRecord]: ...
+
+    async def list_active_older_than(
+        self,
+        tenant_id: TenantId,
+        cutoff: datetime,
+    ) -> list[MemoryRecord]: ...
+
+    async def update_lifecycle_state(
+        self,
+        record_id: MemoryId,
+        tenant_id: TenantId,
+        new_state: LifecycleState,
+    ) -> None: ...
+
+    async def list_by_lifecycle(
+        self,
+        tenant_id: TenantId,
+        lifecycle_state: LifecycleState,
+    ) -> list[MemoryRecord]: ...
+
 
 @runtime_checkable
 class FactRepositoryPort(Protocol):
