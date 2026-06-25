@@ -149,18 +149,24 @@ def clear_overrides():
 # ---------------------------------------------------------------------------
 
 
-# 1
+# 1 — /healthz returns 200 with status "ok" and the standard HealthReport fields.
+# The endpoint serialises the full HealthReport dataclass (version, components,
+# checked_at in addition to status), so we assert each field individually
+# rather than doing an exact-equality check.
 def test_healthz_returns_200() -> None:
     with TestClient(app) as client:
         resp = client.get("/healthz")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert isinstance(body["version"], str)
+    assert isinstance(body["components"], list)
+    assert isinstance(body["checked_at"], str)
 
 
-# 2  — missing X-Tenant-Id must be rejected; handler now returns 400 via
-# RequestValidationError override, but HTTPException(422) from _resolve_tenant
-# is a different path. Either 400 or 422 satisfies the spec requirement
-# "requires X-Tenant-Id header"; we assert it is NOT 200.
+# 2  — missing X-Tenant-Id must be rejected; the TenantMiddleware raises
+# TenantIsolationViolation which the error handler maps to 403. We also
+# accept 400/422 in case request validation fires first on some code paths.
 def test_write_requires_tenant_header() -> None:
     mock_uc = AsyncMock()
     mock_uc.execute.return_value = _make_write_result()
@@ -173,7 +179,7 @@ def test_write_requires_tenant_header() -> None:
     }
     with TestClient(app, raise_server_exceptions=False) as client:
         resp = client.post("/v1/memories:write", json=body)  # no HEADERS
-    assert resp.status_code in (400, 422)
+    assert resp.status_code in (400, 403, 422)
 
 
 # 3

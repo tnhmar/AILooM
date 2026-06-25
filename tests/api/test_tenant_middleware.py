@@ -80,12 +80,19 @@ def _make_memory_record() -> MemoryRecord:
 # ---------------------------------------------------------------------------
 
 
-# 1. /healthz works without X-Tenant-Id
+# 1. /healthz works without X-Tenant-Id and returns the standard HealthReport.
+# The endpoint serialises the full HealthReport dataclass (version, components,
+# checked_at in addition to status), so we assert each field individually
+# rather than doing an exact-equality check.
 def test_healthz_works_without_tenant_header() -> None:
     with TestClient(app) as client:
         resp = client.get("/healthz")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert isinstance(body["version"], str)
+    assert isinstance(body["components"], list)
+    assert isinstance(body["checked_at"], str)
 
 
 # 2. Non-admin /v1/ route without tenant header returns 403
