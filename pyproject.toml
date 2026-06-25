@@ -12,6 +12,9 @@ license = { text = "MIT" }
 
 dependencies = [
     "pydantic>=2",
+    # pydantic-settings is imported unconditionally by config/settings.py;
+    # it must be a core dep, not optional.
+    "pydantic-settings>=2",
     "sqlalchemy>=2",
     "aiosqlite>=0.20",
     # chromadb removed from core dependencies.
@@ -61,6 +64,11 @@ dev = [
     "ruff>=0.4",
     "mypy>=1.10",
     "httpx>=0.27",
+    # Required for tests/mcp/test_server.py
+    "mcp>=1.0",
+    # Required for tests/storage/test_container.py and test_vector_index.py
+    # CVE-2026-45829: dev/test use only — see chroma extra comment above.
+    "chromadb>=0.5",
 ]
 
 [project.scripts]
