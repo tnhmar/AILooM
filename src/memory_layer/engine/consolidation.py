@@ -138,7 +138,6 @@ class ConsolidationService:
         await self._observer.emit(
             ConsolidationJobStartedEvent(
                 tenant_id=tenant_id,
-                record_count=len(batch),
             )
         )
 
@@ -177,8 +176,7 @@ class ConsolidationService:
             await self._observer.emit(
                 MemoryConsolidatedEvent(
                     tenant_id=tenant_id,
-                    source_record_id=record.id,
-                    consolidated_record_id=consolidated.id,
+                    memory_id=record.id,
                 )
             )
 
