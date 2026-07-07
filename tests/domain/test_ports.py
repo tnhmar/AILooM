@@ -51,6 +51,26 @@ class _MinimalRepo:
         self, scope: Any, lifecycle_states: Any, limit: int = 100
     ) -> Any: ...
     async def get_by_idempotency_key(self, key: Any, tenant_id: Any) -> Any: ...
+    async def search(
+        self,
+        tenant_id: Any,
+        query: Any,
+        mode: Any,
+        sectors: Any,
+        lifecycle_states: Any,
+        temporal_filter: Any,
+        k: Any,
+        scope: Any,
+    ) -> Any: ...
+    async def list_active_older_than(
+        self, tenant_id: Any, cutoff: Any
+    ) -> Any: ...
+    async def update_lifecycle_state(
+        self, record_id: Any, tenant_id: Any, new_state: Any
+    ) -> None: ...
+    async def list_by_lifecycle(
+        self, tenant_id: Any, lifecycle_state: Any
+    ) -> Any: ...
 
 
 class _MinimalVectorIndex:
