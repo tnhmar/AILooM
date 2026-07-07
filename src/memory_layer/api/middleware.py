@@ -2,9 +2,9 @@
 
 The middleware intercepts every request on ``/v1/`` routes (excluding admin
 routes) and resolves the tenant ID from the ``X-Tenant-Id`` header, storing
-it on ``request.state.tenant_id``.  Requests that fail resolution propagate
-the ``TenantIsolationViolation`` exception to the registered exception handler
-in ``errors.py``, which returns a 403 JSON response.
+it on ``request.state.tenant_id``.  Requests that fail resolution are returned
+as a 403 JSON response directly from this middleware so that Starlette's
+ServerErrorMiddleware never sees the exception.
 
 Skip rules (applied in order):
 1. Any path not starting with ``/v1/`` is skipped (including ``/healthz``).
@@ -15,12 +15,14 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
 from memory_layer.api.tenant import resolve_tenant_id
+from memory_layer.domain.exceptions import TenantIsolationViolation
 
 _CallNext = Callable[[Request], Awaitable[Response]]
 
@@ -46,9 +48,26 @@ class TenantMiddleware(BaseHTTPMiddleware):
             # header-based tenant resolution.
             return await call_next(request)
 
-        # resolve_tenant_id raises TenantIsolationViolation on failure;
-        # FastAPI's exception handler converts this to a 403 JSON response.
-        tenant_id = resolve_tenant_id(request)
+        # resolve_tenant_id raises TenantIsolationViolation when the
+        # X-Tenant-Id header is absent or mismatched.  We catch it here and
+        # return a 403 directly so that Starlette's ServerErrorMiddleware
+        # does NOT intercept the exception (which would produce a 500).
+        try:
+            tenant_id = resolve_tenant_id(request)
+        except TenantIsolationViolation as exc:
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "error_code": "TENANT_ISOLATION_VIOLATION",
+                    "message": str(exc),
+                    "details": {
+                        "actor": exc.actor,
+                        "requested_tenant_id": exc.requested_tenant_id,
+                    },
+                    "trace_id": None,
+                },
+            )
+
         request.state.tenant_id = tenant_id
         return await call_next(request)
 
